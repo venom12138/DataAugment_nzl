@@ -1,0 +1,2 @@
+CUDA_VISIBLE_DEVICES=0 python3 train_rand.py --no 10 --name ResRandaugtest --dataset cifar100 --model wideresnet --layers 28 --widen-factor 10 --droprate 0.3 --randaugment --cos_lr --N 2 --M 26 --rcutout 16 --Res --augment_prop 0.0
+CUDA_VISIBLE_DEVICES=0 python3 train_rand.py --no 11 --name ResRandaugtest --dataset cifar100 --model wideresnet --layers 28 --widen-factor 10 --droprate 0.3 --randaugment --cos_lr --N 2 --M 26 --rcutout 16 --Res --augment_prop 1.0
