@@ -46,7 +46,7 @@ kwargs = {'num_workers': 1, 'pin_memory': True}
 data_loader = torch.utils.data.DataLoader(
         datasets.__dict__['cifar10'.upper()]('../data', train=False, download=True,
                         transform=data_transform),
-        batch_size=1, shuffle=True, **kwargs)
+        batch_size=1, shuffle=False, **kwargs)
     
 model = eval('networks.resnet.resnet' + str(32) + '_cifar')(dropout_rate=0.0)
 model = torch.nn.DataParallel(model).cuda()
