@@ -93,10 +93,11 @@ class myCIFAR10(VisionDataset):
         self.feature1 = []
         self.feature2 = []
         self.feature3 = []
-        for i in len(os.listdir(feature_path+'feature1')):
-            self.feature1.append(np.load(feature_path+'/feature1/'+str(i)+'.npy', 'rb'))
-            self.feature2.append(np.load(feature_path+'/feature2/'+str(i)+'.npy', 'rb'))
-            self.feature3.append(np.load(feature_path+'/feature3/'+str(i)+'.npy', 'rb'))
+        print(len(os.listdir(feature_path+'/feature1')))
+        for i in range(len(os.listdir(feature_path+'/feature1'))):
+            self.feature1.append(np.load(feature_path+'/feature1/'+str(i)+'.npy', 'r'))
+            self.feature2.append(np.load(feature_path+'/feature2/'+str(i)+'.npy', 'r'))
+            self.feature3.append(np.load(feature_path+'/feature3/'+str(i)+'.npy', 'r'))
         self._load_meta()
 
     def _load_meta(self) -> None:

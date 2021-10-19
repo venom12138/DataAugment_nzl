@@ -44,7 +44,7 @@ data_transform = transforms.Compose([
             ])
 kwargs = {'num_workers': 1, 'pin_memory': True}
 data_loader = torch.utils.data.DataLoader(
-        datasets.__dict__['cifar10'.upper()]('../data', train=False, download=True,
+        datasets.__dict__['cifar10'.upper()]('../data', train=True, download=True,
                         transform=data_transform),
         batch_size=1, shuffle=False, **kwargs)
     
@@ -64,9 +64,9 @@ for i, (input, target) in enumerate(data_loader):
     # compute output
     with torch.no_grad():
         feature1, feature2, feature3 = model.module.gen_feature(input_var)
-        # 128,16,32,32
-        # 128,32,16,16
-        # 128,64,8 ,8
+        # 16,32,32
+        # 32,16,16
+        # 64,8 ,8
     with open('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature1/'+str(i)+'.npy', 'w') as f1: 
         np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature1/'+str(i)+'.npy', feature1.detach().cpu().numpy().tolist())
     with open('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature2/'+str(i)+'.npy', 'w') as f1: 

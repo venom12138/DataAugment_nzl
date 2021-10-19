@@ -1,5 +1,5 @@
 # 用于curriculum baseline++
-CUDA_VISIBLE_DEVICES=0 python3 train_feature.py --no 0 --name feature_extract --dataset cifar10 --model resnet --layers 32
+CUDA_VISIBLE_DEVICES=0 python3 train_tristages.py --no 0 --name tristages --dataset cifar10 --model resnet --layers 56
 # CUDA_VISIBLE_DEVICES=0 python3 train_aug_raw_debug.py --no 4 --name aug_raw_record --dataset cifar100 --model wideresnet --layers 28 --widen-factor 10 --droprate 0.3 --cos_lr
 # python3 train_curriculum_v1.py --no 3 --name curriculum --descrip tristages --dataset cifar100 --model wideresnet --layers 28 --widen-factor 10 --droprate 0.3 --cos_lr --aug_epoch 30 --aug_mode mixup
 # CUDA_VISIBLE_DEVICES=0 python3 train_curriculum.py --no 0 --name curriculum --descrip non_aug --dataset cifar100 --model wideresnet --layers 28 --widen-factor 10 --droprate 0.3 --cos_lr --aug_epoch 1000
