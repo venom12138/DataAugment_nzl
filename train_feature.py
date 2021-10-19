@@ -47,7 +47,7 @@ parser.add_argument('--droprate', default=0.0, type=float,
 
 parser.add_argument('--no-augment', dest='augment', action='store_false',
                     help='whether to use standard augmentation (default: True)')
-parser.set_defaults(augment=False)
+parser.set_defaults(augment=True)
 
 parser.add_argument('--checkpoint', default='checkpoint', type=str, metavar='PATH',
                     help='path to save checkpoint (default: checkpoint)')
@@ -236,7 +236,7 @@ def main():
 
     global class_num
     
-    wandb.init(project="test-project")
+    wandb.init(project="test-project", config = args)
     time1 = time.localtime()
     wandb.run.name = 'feature_extract'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     
@@ -442,6 +442,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
     fc.train()
 
     end = time.time()
+    wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
     for i, (x, target) in enumerate(train_loader):
         target = target.cuda()
         x = x.cuda()
@@ -466,7 +467,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'accuracy': prec1, 'loss': loss})
+        wandb.log({'train_accuracy': prec1, 'loss': loss})
 
         if (i+1) % args.print_freq == 0:
             # print(discriminate_weights)
