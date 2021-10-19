@@ -230,7 +230,23 @@ class ResNet_Cifar(nn.Module):
         # x = x.view(x.size(0), -1)
 
         return feat1, feat2, feat3
- 
+
+    def stagetrain(self, x, feature1, feature2):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+
+        x = self.layer1(x)
+        loss1 = nn.MSELoss(x, feature1)
+        loss1.backward()
+        x = self.layer2(feature1)
+        loss2 = nn.MSELoss(feature2, x)
+        loss2.backward()
+        x = self.layer3(feature2)
+
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        return x, loss1, loss2
 
 class ResNet_MNIST(nn.Module):
 

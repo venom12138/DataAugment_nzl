@@ -50,6 +50,7 @@ class myCIFAR10(VisionDataset):
     def __init__(
             self,
             root: str,
+            feature_path: str,
             train: bool = True,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
@@ -57,7 +58,7 @@ class myCIFAR10(VisionDataset):
     ) -> None:
 
         super(myCIFAR10, self).__init__(root, transform=transform,
-                                      target_transform=target_transform)
+                                    target_transform=target_transform)
 
         self.train = train  # training set or test set
 
@@ -66,7 +67,7 @@ class myCIFAR10(VisionDataset):
 
         if not self._check_integrity():
             raise RuntimeError('Dataset not found or corrupted.' +
-                               ' You can use download=True to download it')
+                            ' You can use download=True to download it')
 
         if self.train:
             downloaded_list = self.train_list
@@ -89,7 +90,13 @@ class myCIFAR10(VisionDataset):
 
         self.data = np.vstack(self.data).reshape(-1, 3, 32, 32)
         self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
-
+        self.feature1 = []
+        self.feature2 = []
+        self.feature3 = []
+        for i in len(os.listdir(feature_path+'feature1')):
+            self.feature1.append(np.load(feature_path+'/feature1/'+str(i)+'.npy', 'rb'))
+            self.feature2.append(np.load(feature_path+'/feature2/'+str(i)+'.npy', 'rb'))
+            self.feature3.append(np.load(feature_path+'/feature3/'+str(i)+'.npy', 'rb'))
         self._load_meta()
 
     def _load_meta(self) -> None:
@@ -110,7 +117,7 @@ class myCIFAR10(VisionDataset):
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
-        img, target = self.data[index], self.targets[index]
+        img, target, feature1, feature2, feature3 = self.data[index], self.targets[index], self.feature1[index], self.feature2[index], self.feature3[index]
 
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
@@ -122,7 +129,7 @@ class myCIFAR10(VisionDataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target, index
+        return img, target, feature1, feature2, feature3
 
     def __len__(self) -> int:
         return len(self.data)

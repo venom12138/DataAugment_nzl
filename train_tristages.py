@@ -1,4 +1,3 @@
-# 从resnet32中提取feature
 import argparse
 import os
 import shutil
@@ -18,6 +17,7 @@ import torchvision.datasets as datasets
 from autoaugment import CIFAR10Policy
 from cutout import Cutout
 from ISDA import EstimatorCV, ISDALoss
+from mydataset import myCIFAR10
 
 import networks.resnet
 import networks.wideresnet
@@ -239,7 +239,7 @@ def main():
     
     wandb.init(project="test-project", config = args)
     time1 = time.localtime()
-    wandb.run.name = 'feature_extract'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.run.name = 'Resnet_50_tristages'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     
     class_num = args.dataset == 'cifar10' and 10 or 100
 
@@ -300,9 +300,10 @@ def main():
 
     kwargs = {'num_workers': 1, 'pin_memory': True}
     assert(args.dataset == 'cifar10' or args.dataset == 'cifar100')
+    # datasets.__dict__[args.dataset.upper()]('../data', train=True, download=True,
+    #                     transform=transform_train),
     train_loader = torch.utils.data.DataLoader(
-        datasets.__dict__[args.dataset.upper()]('../data', train=True, download=True,
-                        transform=transform_train),
+        myCIFAR10('../data', feature_path = './save_feature', train=True, download=True, transform=transform_train),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=True, **kwargs)
     val_loader = torch.utils.data.DataLoader(
         datasets.__dict__[args.dataset.upper()]('../data', train=False, transform=transform_test),
@@ -369,7 +370,7 @@ def main():
     # define loss function (criterion) and optimizer
     # isda_criterion = ISDALoss(int(model.feature_num), class_num).cuda()
     ce_criterion = nn.CrossEntropyLoss().cuda()
-
+    L2_criterion = nn.MSELoss().cuda()
     optimizer = torch.optim.SGD([{'params': model.parameters()},
                                 {'params': fc.parameters()}],
                                 lr=training_configurations[args.model]['initial_learning_rate'],
@@ -402,32 +403,17 @@ def main():
 
         # train for one epoch
         train(train_loader, model, fc, ce_criterion, optimizer, epoch)
-
-        # evaluate on validation set
-        prec1 = validate(val_loader, model, fc, ce_criterion, epoch)
-
-        # remember best prec@1 and save checkpoint
-        is_best = prec1 > best_prec1
-        best_prec1 = max(prec1, best_prec1)
-        wandb.log({'best_accuracy': best_prec1})
+        
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
             'fc': fc.state_dict(),
-            'best_acc': best_prec1,
+            # 'best_acc': best_prec1,
             'optimizer': optimizer.state_dict(),
             #'isda_criterion': isda_criterion,
-            'val_acc': val_acc,
+            # 'val_acc': val_acc,
 
-        }, is_best, checkpoint=check_point)
-        print('Best accuracy: ', best_prec1)
-        np.savetxt(accuracy_file, np.array(val_acc))
-
-    print('Best accuracy: ', best_prec1)
-    print('Average accuracy', sum(val_acc[len(val_acc) - 10:]) / 10)
-    # val_acc.append(sum(val_acc[len(val_acc) - 10:]) / 10)
-    # np.savetxt(val_acc, np.array(val_acc))
-    np.savetxt(accuracy_file, np.array(val_acc))
+        }, checkpoint=check_point)
 
 def train(train_loader, model, fc, criterion, optimizer, epoch):
     """Train for one epoch on the training set"""
@@ -444,15 +430,20 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
     end = time.time()
     wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
-    for i, (x, target) in enumerate(train_loader):
+    for i, (x, target, feature1, feature2, feature3) in enumerate(train_loader):
         target = target.cuda()
         x = x.cuda()
+        feature1 = feature1.cuda()
+        feature2 = feature2.cuda()
+        # feature3 = feature3.cuda()
         input_var = torch.autograd.Variable(x)
         target_var = torch.autograd.Variable(target)
-
+        feature1_var = torch.autograd.Variable(feature1)
+        feature2_var = torch.autograd.Variable(feature2)
+        # feature3_var = torch.autograd.Variable(feature3)
         # compute output
         # loss, output = criterion(model, fc, input_var, target_var, ratio)
-        features = model(input_var) 
+        features, loss1, loss2 = model.module.stagetrain(input_var, feature1_var, feature2_var) 
         output = fc(features)
         loss = criterion(output, target_var)
         # measure accuracy and record loss
@@ -468,7 +459,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'train_accuracy': prec1, 'loss': loss})
+        wandb.log({'laststage_accuracy': prec1, 'loss1': loss1, 'loss2':loss2, 'loss3': loss})
 
         if (i+1) % args.print_freq == 0:
             # print(discriminate_weights)
@@ -570,11 +561,9 @@ def mkdir_p(path):
             raise
 
 
-def save_checkpoint(state, is_best, checkpoint='checkpoint', filename='checkpoint.pth.tar'):
+def save_checkpoint(state, checkpoint='checkpoint', filename='checkpoint.pth.tar'):
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
-    if is_best:
-        shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best.pth.tar'))
 
 
 class AverageMeter(object):
