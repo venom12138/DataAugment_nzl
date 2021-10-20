@@ -370,7 +370,7 @@ def main():
     # define loss function (criterion) and optimizer
     # isda_criterion = ISDALoss(int(model.feature_num), class_num).cuda()
     ce_criterion = nn.CrossEntropyLoss().cuda()
-    L2_criterion = nn.MSELoss().cuda()
+    # L2_criterion = nn.MSELoss().cuda()
     optimizer = torch.optim.SGD([{'params': model.parameters()},
                                 {'params': fc.parameters()}],
                                 lr=training_configurations[args.model]['initial_learning_rate'],

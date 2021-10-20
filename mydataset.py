@@ -90,14 +90,15 @@ class myCIFAR10(VisionDataset):
 
         self.data = np.vstack(self.data).reshape(-1, 3, 32, 32)
         self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
-        self.feature1 = []
-        self.feature2 = []
-        self.feature3 = []
-        print(len(os.listdir(feature_path+'/feature1')))
-        for i in range(len(os.listdir(feature_path+'/feature1'))):
-            self.feature1.append(np.load(feature_path+'/feature1/'+str(i)+'.npy', 'r'))
-            self.feature2.append(np.load(feature_path+'/feature2/'+str(i)+'.npy', 'r'))
-            self.feature3.append(np.load(feature_path+'/feature3/'+str(i)+'.npy', 'r'))
+        self.feature_path = feature_path
+        # self.feature1 = []
+        # self.feature2 = []
+        # self.feature3 = []
+        # print(len(os.listdir(feature_path+'/feature1')))
+        # for i in range(len(os.listdir(feature_path+'/feature1'))):
+        #     self.feature1.append(np.load(feature_path+'/feature1/'+str(i)+'.npy', 'r'))
+        #     self.feature2.append(np.load(feature_path+'/feature2/'+str(i)+'.npy', 'r'))
+        #     self.feature3.append(np.load(feature_path+'/feature3/'+str(i)+'.npy', 'r'))
         self._load_meta()
 
     def _load_meta(self) -> None:
@@ -118,8 +119,15 @@ class myCIFAR10(VisionDataset):
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
-        img, target, feature1, feature2, feature3 = self.data[index], self.targets[index], self.feature1[index], self.feature2[index], self.feature3[index]
-
+        img, target= self.data[index], self.targets[index]
+        feature1 = np.load(self.feature_path+'/feature1/'+str(index)+'.npy', 'r').squeeze()
+        feature2 = np.load(self.feature_path+'/feature2/'+str(index)+'.npy', 'r').squeeze()
+        feature3 = np.load(self.feature_path+'/feature3/'+str(index)+'.npy', 'r').squeeze()
+        
+        feature1 = np.require(feature1, dtype='f4', requirements=['O', 'W'])
+        feature2 = np.require(feature2, dtype='f4', requirements=['O', 'W'])
+        feature3 = np.require(feature3, dtype='f4', requirements=['O', 'W'])
+        # print(feature1.shape)
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
         img = Image.fromarray(img)
