@@ -270,7 +270,6 @@ class ResNet_Cifar(nn.Module):
         
         x = self.layer3(feature2)
         loss3 = criterion(feature3, x)
-        loss3.backward()
         
         x = self.avgpool(feature3)
         x = x.view(x.size(0), -1)
