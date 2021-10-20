@@ -112,7 +112,7 @@ args = parser.parse_args()
 # (specialized for each type of models)
 training_configurations = {
     'resnet': {
-        'epochs': 160,
+        'epochs': 100,
         'batch_size': 128,
         'initial_learning_rate': 0.1,
         'changing_lr': [80, 120],
