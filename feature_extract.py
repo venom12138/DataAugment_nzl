@@ -24,12 +24,10 @@ save_path = '/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature'
 
 if not os.path.exists(save_path):
     os.makedirs(save_path)
-if not os.path.exists(save_path+'/feature1'):
-    os.makedirs(save_path+'/feature1')
-if not os.path.exists(save_path+'/feature2'):
-    os.makedirs(save_path+'/feature2')
-if not os.path.exists(save_path+'/feature3'):
-    os.makedirs(save_path+'/feature3')
+if not os.path.exists(save_path+'/train'):
+    os.makedirs(save_path+'/train')
+if not os.path.exists(save_path+'/test'):
+    os.makedirs(save_path+'/test')
 normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
                                     std=[x / 255.0 for x in [63.0, 62.1, 66.7]])
 data_transform = transforms.Compose([
@@ -37,11 +35,15 @@ data_transform = transforms.Compose([
                 normalize,
             ])
 kwargs = {'num_workers': 1, 'pin_memory': True}
-data_loader = torch.utils.data.DataLoader(
+train_loader = torch.utils.data.DataLoader(
         datasets.__dict__['cifar10'.upper()]('../data', train=True, download=True,
                         transform=data_transform),
         batch_size=1, shuffle=False, **kwargs)
-    
+
+test_loader = torch.utils.data.DataLoader(
+        datasets.__dict__['cifar10'.upper()]('../data', train=False, download=True,
+                        transform=data_transform),
+        batch_size=1, shuffle=False, **kwargs)
 model = eval('networks.resnet.resnet' + str(32) + '_cifar')(dropout_rate=0.0)
 model = torch.nn.DataParallel(model).cuda()
 
@@ -52,7 +54,9 @@ model.eval()
 feature1s = torch.tensor([]).cuda()
 feature2s = torch.tensor([]).cuda()
 feature3s = torch.tensor([]).cuda()
-for i, (input, target) in enumerate(data_loader):
+
+for i, (input, target) in enumerate(train_loader):
+    print('train_loader')
     print(i)
     target = target.cuda()
     input = input.cuda()
@@ -73,10 +77,29 @@ for i, (input, target) in enumerate(data_loader):
     #     np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature2/'+str(i)+'.npy', feature2.detach().cpu().numpy().tolist())
     # with open('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature3/'+str(i)+'.npy', 'w') as f1: 
     #     np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature3/'+str(i)+'.npy', feature3.detach().cpu().numpy().tolist())
-# print(feature1s.shape)
-with open('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature1'+'.npy', 'w') as f1: 
-    np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature1'+'.npy', feature1s.detach().cpu().numpy().tolist())
-with open('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature2'+'.npy', 'w') as f1: 
-    np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature2'+'.npy', feature2s.detach().cpu().numpy().tolist())
-with open('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature3'+'.npy', 'w') as f1: 
-    np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/feature3'+'.npy', feature3s.detach().cpu().numpy().tolist())
+# print(feature1s.shape) 
+np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/train/train_feature1.npy', feature1s.detach().cpu().numpy().tolist()) 
+np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/train/train_feature2.npy', feature2s.detach().cpu().numpy().tolist())
+np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/train/train_feature3.npy', feature3s.detach().cpu().numpy().tolist())
+feature1s = torch.tensor([]).cuda()
+feature2s = torch.tensor([]).cuda()
+feature3s = torch.tensor([]).cuda()
+for i, (input, target) in enumerate(test_loader):
+    print('test loader')
+    print(i)
+    target = target.cuda()
+    input = input.cuda()
+    input_var = torch.autograd.Variable(input)
+    target_var = torch.autograd.Variable(target)
+    # compute output
+    with torch.no_grad():
+        feature1, feature2, feature3 = model.module.gen_feature(input_var)
+    feature1s = torch.cat((feature1s, feature1),dim = 0)
+    feature2s = torch.cat((feature2s, feature2),dim = 0)
+    feature3s = torch.cat((feature3s, feature3),dim = 0)
+print(feature1s.shape)
+print(feature2s.shape)
+print(feature3s.shape)
+np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/test/test_feature1.npy', feature1s.detach().cpu().numpy().tolist()) 
+np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/test/test_feature2.npy', feature2s.detach().cpu().numpy().tolist())
+np.save('/home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/save_feature/test/test_feature3.npy', feature3s.detach().cpu().numpy().tolist())

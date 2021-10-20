@@ -96,9 +96,14 @@ class myCIFAR10(VisionDataset):
         self.feature3 = []
         # print(len(os.listdir(feature_path+'/feature1')))
         # for i in range(3):
-        self.feature1 = np.load(feature_path+'/feature1.npy', 'r')
-        self.feature2 = np.load(feature_path+'/feature2.npy', 'r')
-        self.feature3 = np.load(feature_path+'/feature3.npy', 'r')
+        if self.train:
+            self.feature1 = np.load(feature_path+'/train/train_feature1.npy', 'r')
+            self.feature2 = np.load(feature_path+'/train/train_feature2.npy', 'r')
+            self.feature3 = np.load(feature_path+'/train/train_feature3.npy', 'r')
+        else:
+            self.feature1 = np.load(feature_path+'/test/test_feature1.npy', 'r')
+            self.feature2 = np.load(feature_path+'/test/test_feature2.npy', 'r')
+            self.feature3 = np.load(feature_path+'/test/test_feature3.npy', 'r')
         print(self.feature1.shape)
         print(self.feature2.shape)
         print(self.feature3.shape)

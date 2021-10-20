@@ -252,6 +252,25 @@ class ResNet_Cifar(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         return x, loss1, loss2
+    
+    def stagetest(self, x, feature1, feature2):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+
+        x = self.layer1(x)
+        
+        criterion = nn.MSELoss()
+        loss1 = criterion(x, feature1)
+        
+        x = self.layer2(feature1)
+        loss2 = criterion(feature2, x)
+        
+        x = self.layer3(feature2)
+
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        return x, loss1, loss2
 
 class ResNet_MNIST(nn.Module):
 

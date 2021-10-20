@@ -228,7 +228,9 @@ loss_file = record_path + '/loss_epoch.txt'
 check_point = os.path.join(record_path, args.checkpoint)
 
 def main():
-
+    global min_loss
+    min_loss = 10000
+    
     global best_prec1
     best_prec1 = 0
 
@@ -240,7 +242,14 @@ def main():
     wandb.init(project="test-project", config = args)
     time1 = time.localtime()
     wandb.run.name = 'Resnet_50_tristages'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
-    
+    wandb.define_metric("train_loss1", summary="min")
+    wandb.define_metric('train_loss2', summary='min')
+    wandb.define_metric('train_loss3', summary='min')
+    wandb.define_metric('test_loss1', summary='min')
+    wandb.define_metric('test_loss2', summary='min')
+    wandb.define_metric('test_loss3', summary='min')
+    wandb.define_metric('test_laststage_accuracy', summary='max')
+    wandb.define_metric('train_laststage_accuracy', summary='max')
     class_num = args.dataset == 'cifar10' and 10 or 100
 
     normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
@@ -306,7 +315,7 @@ def main():
         myCIFAR10('../data', feature_path = './save_feature', train=True, download=True, transform=transform_train),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=True, **kwargs)
     val_loader = torch.utils.data.DataLoader(
-        datasets.__dict__[args.dataset.upper()]('../data', train=False, transform=transform_test),
+        myCIFAR10('../data', feature_path = './save_feature', train=False, download=True, transform=transform_test),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=True, **kwargs)
 
     # create model
@@ -390,9 +399,9 @@ def main():
         model.load_state_dict(checkpoint['state_dict'])
         fc.load_state_dict(checkpoint['fc'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        isda_criterion = checkpoint['isda_criterion']
-        val_acc = checkpoint['val_acc']
-        best_prec1 = checkpoint['best_acc']
+        # isda_criterion = checkpoint['isda_criterion']
+        # val_acc = checkpoint['val_acc']
+        # best_prec1 = checkpoint['best_acc']
         np.savetxt(accuracy_file, np.array(val_acc))
     else:
         start_epoch = 0
@@ -403,7 +412,9 @@ def main():
 
         # train for one epoch
         train(train_loader, model, fc, ce_criterion, optimizer, epoch)
-        
+        prec1, avg_loss = validate(val_loader, model, fc, ce_criterion, epoch)
+        is_best = avg_loss < min_loss
+        min_loss = min(avg_loss, min_loss)
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
@@ -413,7 +424,7 @@ def main():
             #'isda_criterion': isda_criterion,
             # 'val_acc': val_acc,
 
-        }, checkpoint=check_point)
+        }, is_best, checkpoint=check_point)
 
 def train(train_loader, model, fc, criterion, optimizer, epoch):
     """Train for one epoch on the training set"""
@@ -459,7 +470,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'laststage_accuracy': prec1, 'loss1': loss1, 'loss2':loss2, 'loss3': loss})
+        wandb.log({'train_laststage_accuracy': prec1, 'train_loss1': loss1, 'train_loss2':loss2, 'train_loss3': loss})
 
         if (i+1) % args.print_freq == 0:
             # print(discriminate_weights)
@@ -489,15 +500,20 @@ def validate(val_loader, model, fc, criterion, epoch):
     fc.eval()
 
     end = time.time()
-    for i, (input, target) in enumerate(val_loader):
+    
+    for i, (input, target, feature1, feature2, _) in enumerate(val_loader):
         target = target.cuda()
         input = input.cuda()
+        feature1 = feature1.cuda()
+        feature2 = feature2.cuda()
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
-
+        feature1_var = torch.autograd.Variable(feature1)
+        feature2_var = torch.autograd.Variable(feature2)
+        
         # compute output
         with torch.no_grad():
-            features = model(input_var)
+            features, loss1, loss2 = model.module.stagetest(input_var, feature1_var, feature2_var) 
             output = fc(features)
 
         loss = criterion(output, target_var)
@@ -505,12 +521,14 @@ def validate(val_loader, model, fc, criterion, epoch):
         # measure accuracy and record loss
         prec1 = accuracy(output.data, target, topk=(1,))[0]
         losses.update(loss.data.item(), input.size(0))
+        losses.update(loss1.data.item(), input.size(0))
+        losses.update(loss2.data.item(), input.size(0))
         top1.update(prec1.item(), input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-
+        wandb.log({'test_laststage_accuracy': prec1, 'test_loss1': loss1, 'test_loss2':loss2, 'test_loss3': loss})
 
         if (i+1) % args.print_freq == 0:
             fd = open(record_file, 'a+')
@@ -536,7 +554,7 @@ def validate(val_loader, model, fc, criterion, epoch):
     fd.close()
     val_acc.append(top1.ave)
 
-    return top1.ave
+    return top1.ave, losses.ave
 
 class Full_layer(torch.nn.Module):
     '''explicitly define the full connected layer'''
@@ -561,9 +579,11 @@ def mkdir_p(path):
             raise
 
 
-def save_checkpoint(state, checkpoint='checkpoint', filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, checkpoint='checkpoint', filename='checkpoint.pth.tar'):
     filepath = os.path.join(checkpoint, filename)
     torch.save(state, filepath)
+    if is_best:
+        shutil.copyfile(filepath, os.path.join(checkpoint, 'model_best.pth.tar'))
 
 
 class AverageMeter(object):
