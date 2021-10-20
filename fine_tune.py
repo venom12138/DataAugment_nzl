@@ -241,7 +241,7 @@ def main():
     
     wandb.init(project="test-project", config = args)
     time1 = time.localtime()
-    wandb.run.name = 'Resnet_32_tristages_eval'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.run.name = 'Resnet_50_tristages_finetune'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     wandb.define_metric("train_loss1", summary="min")
     wandb.define_metric('train_loss2', summary='min')
     wandb.define_metric('train_loss3', summary='min')

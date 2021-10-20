@@ -241,7 +241,7 @@ def main():
     
     wandb.init(project="test-project", config = args)
     time1 = time.localtime()
-    wandb.run.name = 'Resnet_32_tristages_eval'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.run.name = 'Resnet_50_fourstages'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     wandb.define_metric("train_loss1", summary="min")
     wandb.define_metric('train_loss2', summary='min')
     wandb.define_metric('train_loss3', summary='min')
@@ -441,21 +441,21 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
     end = time.time()
     wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
-    for i, (x, target, feature1, feature2, _) in enumerate(train_loader):
+    for i, (x, target, feature1, feature2, feature3) in enumerate(train_loader):
         target = target.cuda()
         x = x.cuda()
         feature1 = feature1.cuda()
         feature2 = feature2.cuda()
-        # feature3 = feature3.cuda()
+        feature3 = feature3.cuda()
         input_var = torch.autograd.Variable(x)
         target_var = torch.autograd.Variable(target)
         feature1_var = torch.autograd.Variable(feature1)
         feature2_var = torch.autograd.Variable(feature2)
-        # feature3_var = torch.autograd.Variable(feature3)
+        feature3_var = torch.autograd.Variable(feature3)
         # compute output
         # loss, output = criterion(model, fc, input_var, target_var, ratio)
         optimizer.zero_grad()
-        features, loss1, loss2 = model.module.stagetrain(input_var, feature1_var, feature2_var) 
+        features, loss1, loss2, loss3 = model.module.stagetrain(input_var, feature1_var, feature2_var, feature3_var) 
         output = fc(features)
         loss = criterion(output, target_var)
         # measure accuracy and record loss
@@ -470,7 +470,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'train_laststage_accuracy': prec1, 'train_loss1': loss1, 'train_loss2':loss2, 'train_loss3': loss})
+        wandb.log({'train_laststage_accuracy': prec1, 'train_loss1': loss1, 'train_loss2':loss2, 'train_loss3': loss3, 'train_loss4': loss})
 
         if (i+1) % args.print_freq == 0:
             # print(discriminate_weights)
@@ -501,19 +501,20 @@ def validate(val_loader, model, fc, criterion, epoch):
 
     end = time.time()
     
-    for i, (input, target, feature1, feature2, _) in enumerate(val_loader):
+    for i, (input, target, feature1, feature2, feature3) in enumerate(val_loader):
         target = target.cuda()
         input = input.cuda()
         feature1 = feature1.cuda()
         feature2 = feature2.cuda()
+        feature3 = feature3.cuda()
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
         feature1_var = torch.autograd.Variable(feature1)
         feature2_var = torch.autograd.Variable(feature2)
-        
+        feature3_var = torch.autograd.Variable(feature3)
         # compute output
         with torch.no_grad():
-            features, loss1, loss2 = model.module.stagetest(input_var, feature1_var, feature2_var) 
+            features, loss1, loss2, loss3 = model.module.stagetest(input_var, feature1_var, feature2_var, feature3_var) 
             output = fc(features)
 
         loss = criterion(output, target_var)
@@ -523,12 +524,13 @@ def validate(val_loader, model, fc, criterion, epoch):
         losses.update(loss.data.item(), input.size(0))
         losses.update(loss1.data.item(), input.size(0))
         losses.update(loss2.data.item(), input.size(0))
+        losses.update(loss3.data.item(), input.size(0))
         top1.update(prec1.item(), input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'test_laststage_accuracy': prec1, 'test_loss1': loss1, 'test_loss2':loss2, 'test_loss3': loss})
+        wandb.log({'test_laststage_accuracy': prec1, 'test_loss1': loss1, 'test_loss2':loss2, 'test_loss3': loss3, 'test_loss4':loss})
 
         if (i+1) % args.print_freq == 0:
             fd = open(record_file, 'a+')

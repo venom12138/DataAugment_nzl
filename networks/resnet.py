@@ -231,7 +231,7 @@ class ResNet_Cifar(nn.Module):
 
         return feat1, feat2, feat3
 
-    def stagetrain(self, x, feature1, feature2):
+    def stagetrain(self, x, feature1, feature2, feature3):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -248,12 +248,14 @@ class ResNet_Cifar(nn.Module):
         loss2.backward()
         
         x = self.layer3(feature2)
-
-        x = self.avgpool(x)
+        loss3 = criterion(feature3, x)
+        loss3.backward()
+        
+        x = self.avgpool(feature3)
         x = x.view(x.size(0), -1)
-        return x, loss1, loss2
+        return x, loss1, loss2, loss3
     
-    def stagetest(self, x, feature1, feature2):
+    def stagetest(self, x, feature1, feature2, feature3):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -267,10 +269,12 @@ class ResNet_Cifar(nn.Module):
         loss2 = criterion(feature2, x)
         
         x = self.layer3(feature2)
-
-        x = self.avgpool(x)
+        loss3 = criterion(feature3, x)
+        loss3.backward()
+        
+        x = self.avgpool(feature3)
         x = x.view(x.size(0), -1)
-        return x, loss1, loss2
+        return x, loss1, loss2, loss3
 
 class ResNet_MNIST(nn.Module):
 
