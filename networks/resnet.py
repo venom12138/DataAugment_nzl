@@ -240,6 +240,7 @@ class ResNet_Cifar(nn.Module):
         
         criterion = nn.MSELoss()
         loss1 = criterion(x, feature1)
+        
         loss1.backward()
         
         x = self.layer2(feature1)

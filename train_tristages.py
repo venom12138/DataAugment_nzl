@@ -443,6 +443,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
         # feature3_var = torch.autograd.Variable(feature3)
         # compute output
         # loss, output = criterion(model, fc, input_var, target_var, ratio)
+        optimizer.zero_grad()
         features, loss1, loss2 = model.module.stagetrain(input_var, feature1_var, feature2_var) 
         output = fc(features)
         loss = criterion(output, target_var)
@@ -452,7 +453,6 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
         top1.update(prec1.item(), x.size(0))
 
         # compute gradient and do SGD step
-        optimizer.zero_grad()
         loss.backward()
 
         optimizer.step()
