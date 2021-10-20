@@ -237,9 +237,9 @@ def main():
 
     global class_num
     
-    # wandb.init(project="test-project", config = args)
-    # time1 = time.localtime()
-    # wandb.run.name = 'Resnet_50_tristages'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.init(project="test-project", config = args)
+    time1 = time.localtime()
+    wandb.run.name = 'Resnet_50_tristages'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     
     class_num = args.dataset == 'cifar10' and 10 or 100
 
@@ -429,7 +429,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
     fc.train()
 
     end = time.time()
-    # wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
+    wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
     for i, (x, target, feature1, feature2, _) in enumerate(train_loader):
         target = target.cuda()
         x = x.cuda()
@@ -459,7 +459,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
         batch_time.update(time.time() - end)
         end = time.time()
-        # wandb.log({'laststage_accuracy': prec1, 'loss1': loss1, 'loss2':loss2, 'loss3': loss})
+        wandb.log({'laststage_accuracy': prec1, 'loss1': loss1, 'loss2':loss2, 'loss3': loss})
 
         if (i+1) % args.print_freq == 0:
             # print(discriminate_weights)
