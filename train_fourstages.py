@@ -441,7 +441,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
     end = time.time()
     wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
-    for i, (x, target, feature1, feature2, feature3) in enumerate(train_loader):
+    for i, (x, target, feature1, feature2, feature3, output_data) in enumerate(train_loader):
         target = target.cuda()
         x = x.cuda()
         feature1 = feature1.cuda()
@@ -457,7 +457,11 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
         optimizer.zero_grad()
         features, loss1, loss2, loss3 = model.module.stagetrain(input_var, feature1_var, feature2_var, feature3_var) 
         output = fc(features)
-        loss = criterion(output, target_var)
+        print(target)
+        print(output_data.shape)
+        
+        loss = F.kl_div(output_data.softmax(dim=-1).log(), output.softmax(dim=-1), reduction='batchmean').cuda()
+        # loss = criterion(output, output_data)
         # measure accuracy and record loss
         prec1 = accuracy(output.data, target, topk=(1,))[0]
         losses.update(loss.data.item(), x.size(0))
@@ -501,23 +505,27 @@ def validate(val_loader, model, fc, criterion, epoch):
 
     end = time.time()
     
-    for i, (input, target, feature1, feature2, feature3) in enumerate(val_loader):
+    for i, (input, target, feature1, feature2, feature3, output_data) in enumerate(val_loader):
         target = target.cuda()
         input = input.cuda()
         feature1 = feature1.cuda()
         feature2 = feature2.cuda()
         feature3 = feature3.cuda()
+        # output_data = output_data.cuda()
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
         feature1_var = torch.autograd.Variable(feature1)
         feature2_var = torch.autograd.Variable(feature2)
         feature3_var = torch.autograd.Variable(feature3)
+        # output_var = torch.autograd.Variable(output_data)
+    
         # compute output
         with torch.no_grad():
             features, loss1, loss2, loss3 = model.module.stagetest(input_var, feature1_var, feature2_var, feature3_var) 
             output = fc(features)
 
-        loss = criterion(output, target_var)
+        loss = F.kl_div(output_data.softmax(dim=-1).log(), output.softmax(dim=-1), reduction='batchmean').cuda()
+        # loss = criterion(output, output_data)
 
         # measure accuracy and record loss
         prec1 = accuracy(output.data, target, topk=(1,))[0]

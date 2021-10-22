@@ -226,10 +226,10 @@ class ResNet_Cifar(nn.Module):
         feat2 = self.layer2(feat1) # feature map2
         feat3 = self.layer3(feat2)
 
-        # x = self.avgpool(feat3)
-        # x = x.view(x.size(0), -1)
+        x = self.avgpool(feat3)
+        x = x.view(x.size(0), -1)
 
-        return feat1, feat2, feat3
+        return x, feat1, feat2, feat3
 
     def stagetrain(self, x, feature1, feature2, feature3):
         x = self.conv1(x)

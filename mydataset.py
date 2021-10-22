@@ -94,19 +94,23 @@ class myCIFAR10(VisionDataset):
         self.feature1 = []
         self.feature2 = []
         self.feature3 = []
+        self.output_data =[]
         # print(len(os.listdir(feature_path+'/feature1')))
         # for i in range(3):
         if self.train:
             self.feature1 = np.load(feature_path+'/train/train_feature1.npy', 'r')
             self.feature2 = np.load(feature_path+'/train/train_feature2.npy', 'r')
             self.feature3 = np.load(feature_path+'/train/train_feature3.npy', 'r')
+            self.output_data = np.load(feature_path+'/train/train_output.npy', 'r')
         else:
             self.feature1 = np.load(feature_path+'/test/test_feature1.npy', 'r')
             self.feature2 = np.load(feature_path+'/test/test_feature2.npy', 'r')
             self.feature3 = np.load(feature_path+'/test/test_feature3.npy', 'r')
+            self.output_data = np.load(feature_path+'/test/test_output.npy', 'r')
         print(self.feature1.shape)
         print(self.feature2.shape)
         print(self.feature3.shape)
+        print(self.output_data.shape)
         self._load_meta()
 
     def _load_meta(self) -> None:
@@ -127,7 +131,7 @@ class myCIFAR10(VisionDataset):
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
-        img, target, feature1, feature2, feature3= self.data[index], self.targets[index], self.feature1[index], self.feature2[index], self.feature3[index]
+        img, target, feature1, feature2, feature3, output_data= self.data[index], self.targets[index], self.feature1[index], self.feature2[index], self.feature3[index],self.output_data[index]
         # feature1 = np.load(self.feature_path+'/feature1/'+str(index)+'.npy', 'r').squeeze()
         # feature2 = np.load(self.feature_path+'/feature2/'+str(index)+'.npy', 'r').squeeze()
         # feature3 = np.load(self.feature_path+'/feature3/'+str(index)+'.npy', 'r').squeeze()
@@ -135,7 +139,7 @@ class myCIFAR10(VisionDataset):
         feature1 = np.require(feature1, dtype='float32', requirements=['O', 'W'])
         feature2 = np.require(feature2, dtype='float32', requirements=['O', 'W'])
         feature3 = np.require(feature3, dtype='float32', requirements=['O', 'W'])
-        
+        output_data = np.require(output_data, dtype='float32', requirements=['O', 'W'])
         # print(feature1.shape)
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
@@ -147,7 +151,7 @@ class myCIFAR10(VisionDataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target, feature1, feature2, feature3
+        return img, target, feature1, feature2, feature3, output_data
 
     def __len__(self) -> int:
         return len(self.data)
