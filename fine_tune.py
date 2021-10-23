@@ -241,7 +241,7 @@ def main():
     
     wandb.init(project="test-project", config = args)
     time1 = time.localtime()
-    wandb.run.name = 'Resnet_50_tristages_finetune'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.run.name = 'Resnet_50_fourstages_finetune'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     wandb.define_metric("train_loss1", summary="min")
     wandb.define_metric('train_loss2', summary='min')
     wandb.define_metric('train_loss3', summary='min')
@@ -312,10 +312,12 @@ def main():
     # datasets.__dict__[args.dataset.upper()]('../data', train=True, download=True,
     #                     transform=transform_train),
     train_loader = torch.utils.data.DataLoader(
-        myCIFAR10('../data', feature_path = './save_feature', train=True, download=True, transform=transform_train),
+        datasets.__dict__[args.dataset.upper()]('../data', train=True, download=True,
+                                                transform=transform_train),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=True, **kwargs)
     val_loader = torch.utils.data.DataLoader(
-        myCIFAR10('../data', feature_path = './save_feature', train=False, download=True, transform=transform_test),
+        datasets.__dict__[args.dataset.upper()]('../data', train=False, download=True,
+                                                transform=transform_test),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=True, **kwargs)
 
     # create model
@@ -395,14 +397,14 @@ def main():
         assert os.path.isfile(args.resume), 'Error: no checkpoint directory found!'
         args.checkpoint = os.path.dirname(args.resume)
         checkpoint = torch.load(args.resume)
-        start_epoch = checkpoint['epoch']
+        start_epoch = 0 # checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         fc.load_state_dict(checkpoint['fc'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         # isda_criterion = checkpoint['isda_criterion']
         # val_acc = checkpoint['val_acc']
         # best_prec1 = checkpoint['best_acc']
-        np.savetxt(accuracy_file, np.array(val_acc))
+        # np.savetxt(accuracy_file, np.array(val_acc))
     else:
         start_epoch = 0
 
@@ -413,8 +415,9 @@ def main():
         # train for one epoch
         train(train_loader, model, fc, ce_criterion, optimizer, epoch)
         prec1, avg_loss = validate(val_loader, model, fc, ce_criterion, epoch)
-        is_best = avg_loss < min_loss
-        min_loss = min(avg_loss, min_loss)
+        wandb.log({'test_accuracy': prec1})
+        is_best = prec1 > best_prec1
+        min_loss = max(best_prec1, prec1)
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
@@ -441,21 +444,21 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
     end = time.time()
     wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
-    for i, (x, target, feature1, feature2, _) in enumerate(train_loader):
+    for i, (x, target) in enumerate(train_loader):
         target = target.cuda()
         x = x.cuda()
-        feature1 = feature1.cuda()
-        feature2 = feature2.cuda()
+        # feature1 = feature1.cuda()
+        # feature2 = feature2.cuda()
         # feature3 = feature3.cuda()
         input_var = torch.autograd.Variable(x)
         target_var = torch.autograd.Variable(target)
-        feature1_var = torch.autograd.Variable(feature1)
-        feature2_var = torch.autograd.Variable(feature2)
+        # feature1_var = torch.autograd.Variable(feature1)
+        # feature2_var = torch.autograd.Variable(feature2)
         # feature3_var = torch.autograd.Variable(feature3)
         # compute output
         # loss, output = criterion(model, fc, input_var, target_var, ratio)
         optimizer.zero_grad()
-        features, loss1, loss2 = model.module.stagetrain(input_var, feature1_var, feature2_var) 
+        features = model(input_var) 
         output = fc(features)
         loss = criterion(output, target_var)
         # measure accuracy and record loss
@@ -470,7 +473,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'train_laststage_accuracy': prec1, 'train_loss1': loss1, 'train_loss2':loss2, 'train_loss3': loss})
+        wandb.log({'train_accuracy': prec1})
 
         if (i+1) % args.print_freq == 0:
             # print(discriminate_weights)
@@ -501,19 +504,19 @@ def validate(val_loader, model, fc, criterion, epoch):
 
     end = time.time()
     
-    for i, (input, target, feature1, feature2, _) in enumerate(val_loader):
+    for i, (input, target) in enumerate(val_loader):
         target = target.cuda()
         input = input.cuda()
-        feature1 = feature1.cuda()
-        feature2 = feature2.cuda()
+        # feature1 = feature1.cuda()
+        # feature2 = feature2.cuda()
         input_var = torch.autograd.Variable(input)
         target_var = torch.autograd.Variable(target)
-        feature1_var = torch.autograd.Variable(feature1)
-        feature2_var = torch.autograd.Variable(feature2)
+        # feature1_var = torch.autograd.Variable(feature1)
+        # feature2_var = torch.autograd.Variable(feature2)
         
         # compute output
         with torch.no_grad():
-            features, loss1, loss2 = model.module.stagetest(input_var, feature1_var, feature2_var) 
+            features = model(input_var) 
             output = fc(features)
 
         loss = criterion(output, target_var)
@@ -521,14 +524,14 @@ def validate(val_loader, model, fc, criterion, epoch):
         # measure accuracy and record loss
         prec1 = accuracy(output.data, target, topk=(1,))[0]
         losses.update(loss.data.item(), input.size(0))
-        losses.update(loss1.data.item(), input.size(0))
-        losses.update(loss2.data.item(), input.size(0))
+        # losses.update(loss1.data.item(), input.size(0))
+        # losses.update(loss2.data.item(), input.size(0))
         top1.update(prec1.item(), input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'test_laststage_accuracy': prec1, 'test_loss1': loss1, 'test_loss2':loss2, 'test_loss3': loss})
+        # wandb.log({'test_laststage_accuracy': prec1,'test_loss3': loss})
 
         if (i+1) % args.print_freq == 0:
             fd = open(record_file, 'a+')

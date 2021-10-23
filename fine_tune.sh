@@ -1,0 +1,2 @@
+CUDA_VISIBLE_DEVICES=0 python3 fine_tune.py --no 0 --name finetune --dataset cifar10 --model resnet --layers 56 --resume /home/yu-jw19/venom/ISDA-for-Deep-Networks/CIFAR/ISDA\ test/cifar10_resnet-56_fourstages/no_0_lambda_0_0.5_standard-Aug_/checkpoint/model_best.pth.tar
+# CUDA_VISIBLE_DEVICES=0 python3 train_rand.py --no 11 --name ResRandaugtest --dataset cifar100 --model wideresnet --layers 28 --widen-factor 10 --droprate 0.3 --randaugment --cos_lr --N 2 --M 26 --rcutout 16 --Res --augment_prop 1.0

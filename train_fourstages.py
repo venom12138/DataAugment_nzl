@@ -91,6 +91,9 @@ parser.add_argument('--autoaugment', dest='autoaugment', action='store_true',
                     help='whether to use autoaugment')
 parser.set_defaults(autoaugment=False)
 
+parser.add_argument('--kl_div', dest='kl_div', action='store_true',
+                    help='whether to use kl_div')
+parser.set_defaults(kl_div=False)
 # cutout
 parser.add_argument('--cutout', dest='cutout', action='store_true',
                     help='whether to use cutout')
@@ -239,9 +242,9 @@ def main():
 
     global class_num
     
-    wandb.init(project="test-project", config = args)
+    wandb.init(project="test-project", config = args, group = 'localized_train')
     time1 = time.localtime()
-    wandb.run.name = 'Resnet_50_fourstages'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.run.name = 'Resnet_56_fourstages'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     wandb.define_metric("train_loss1", summary="min")
     wandb.define_metric('train_loss2', summary='min')
     wandb.define_metric('train_loss3', summary='min')
@@ -398,7 +401,7 @@ def main():
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         fc.load_state_dict(checkpoint['fc'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        # optimizer.load_state_dict(checkpoint['optimizer'])
         # isda_criterion = checkpoint['isda_criterion']
         # val_acc = checkpoint['val_acc']
         # best_prec1 = checkpoint['best_acc']
@@ -409,10 +412,11 @@ def main():
     for epoch in range(start_epoch, training_configurations[args.model]['epochs']):
 
         adjust_learning_rate(optimizer, epoch + 1)
-
-        # train for one epoch
-        train(train_loader, model, fc, ce_criterion, optimizer, epoch)
-        prec1, avg_loss = validate(val_loader, model, fc, ce_criterion, epoch)
+        
+        acc_train, train_loss1, train_loss2, train_loss3, train_loss4 = train(train_loader, model, fc, ce_criterion, optimizer, epoch)
+        acc_test, test_loss1, test_loss2, test_loss3, test_loss4, avg_loss = validate(val_loader, model, fc, ce_criterion, epoch)
+        wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']},commit = False)
+        wandb.log({'test_laststage_accuracy': acc_test, 'test_loss1': test_loss1, 'test_loss2':test_loss2, 'test_loss3': test_loss3, 'test_loss4': test_loss4,'train_loss1':train_loss1, 'train_loss2':train_loss2, 'train_loss3':train_loss3, 'train_loss4':train_loss4})
         is_best = avg_loss < min_loss
         min_loss = min(avg_loss, min_loss)
         save_checkpoint({
@@ -430,6 +434,9 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
     """Train for one epoch on the training set"""
     batch_time = AverageMeter()
     losses = AverageMeter()
+    losses1 = AverageMeter()
+    losses2 = AverageMeter()
+    losses3 = AverageMeter()
     top1 = AverageMeter()
 
     train_batches_num = len(train_loader)
@@ -440,10 +447,11 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
     fc.train()
 
     end = time.time()
-    wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
+    
     for i, (x, target, feature1, feature2, feature3, output_data) in enumerate(train_loader):
         target = target.cuda()
         x = x.cuda()
+        output_data = output_data.cuda()
         feature1 = feature1.cuda()
         feature2 = feature2.cuda()
         feature3 = feature3.cuda()
@@ -455,16 +463,21 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
         # compute output
         # loss, output = criterion(model, fc, input_var, target_var, ratio)
         optimizer.zero_grad()
-        features, loss1, loss2, loss3 = model.module.stagetrain(input_var, feature1_var, feature2_var, feature3_var) 
+        features, loss1, loss2, loss3 = model.module.stagetrain4(input_var, feature1_var, feature2_var, feature3_var) 
         output = fc(features)
-        print(target)
-        print(output_data.shape)
-        
-        loss = F.kl_div(output_data.softmax(dim=-1).log(), output.softmax(dim=-1), reduction='batchmean').cuda()
+        if args.kl_div:
+            loss = F.kl_div(output_data.softmax(dim=-1).log(), output.softmax(dim=-1), reduction='batchmean').cuda()
+        else:
+            loss = criterion(output, target_var)
+        # loss = F.kl_div(output_data.softmax(dim=-1).log(), output.softmax(dim=-1), reduction='batchmean').cuda()
         # loss = criterion(output, output_data)
         # measure accuracy and record loss
         prec1 = accuracy(output.data, target, topk=(1,))[0]
         losses.update(loss.data.item(), x.size(0))
+        losses1.update(loss1.data.item(), x.size(0))
+        losses2.update(loss2.data.item(), x.size(0))
+        losses3.update(loss3.data.item(), x.size(0))
+        
         top1.update(prec1.item(), x.size(0))
 
         # compute gradient and do SGD step
@@ -474,7 +487,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'train_laststage_accuracy': prec1, 'train_loss1': loss1, 'train_loss2':loss2, 'train_loss3': loss3, 'train_loss4': loss})
+        # wandb.log({'train_laststage_accuracy': prec1, 'train_loss1': loss1, 'train_loss2':loss2, 'train_loss3': loss3, 'train_loss4': loss})
 
         if (i+1) % args.print_freq == 0:
             # print(discriminate_weights)
@@ -489,12 +502,16 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
             print(string)
             fd.write(string + '\n')
             fd.close()
-
+    return top1.ave, losses1.ave, losses2.ave, losses3.ave, losses.ave
 
 def validate(val_loader, model, fc, criterion, epoch):
     """Perform validation on the validation set"""
     batch_time = AverageMeter()
     losses = AverageMeter()
+    losses1 = AverageMeter()
+    losses2 = AverageMeter()
+    losses3 = AverageMeter()
+    avglosses = AverageMeter()
     top1 = AverageMeter()
 
     train_batches_num = len(val_loader)
@@ -508,6 +525,7 @@ def validate(val_loader, model, fc, criterion, epoch):
     for i, (input, target, feature1, feature2, feature3, output_data) in enumerate(val_loader):
         target = target.cuda()
         input = input.cuda()
+        output_data = output_data.cuda()
         feature1 = feature1.cuda()
         feature2 = feature2.cuda()
         feature3 = feature3.cuda()
@@ -521,24 +539,30 @@ def validate(val_loader, model, fc, criterion, epoch):
     
         # compute output
         with torch.no_grad():
-            features, loss1, loss2, loss3 = model.module.stagetest(input_var, feature1_var, feature2_var, feature3_var) 
+            features, loss1, loss2, loss3 = model.module.stagetest4(input_var, feature1_var, feature2_var, feature3_var) 
             output = fc(features)
 
-        loss = F.kl_div(output_data.softmax(dim=-1).log(), output.softmax(dim=-1), reduction='batchmean').cuda()
-        # loss = criterion(output, output_data)
+        if args.kl_div:
+            loss = F.kl_div(output_data.softmax(dim=-1).log(), output.softmax(dim=-1), reduction='batchmean').cuda()
+        else:
+            loss = criterion(output, target_var)
 
         # measure accuracy and record loss
         prec1 = accuracy(output.data, target, topk=(1,))[0]
         losses.update(loss.data.item(), input.size(0))
-        losses.update(loss1.data.item(), input.size(0))
-        losses.update(loss2.data.item(), input.size(0))
-        losses.update(loss3.data.item(), input.size(0))
+        losses1.update(loss1.data.item(), input.size(0))
+        losses2.update(loss2.data.item(), input.size(0))
+        losses3.update(loss3.data.item(), input.size(0))
+        avglosses.update(loss.data.item(), input.size(0))
+        avglosses.update(loss1.data.item(), input.size(0))
+        avglosses.update(loss2.data.item(), input.size(0))
+        avglosses.update(loss3.data.item(), input.size(0))
         top1.update(prec1.item(), input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'test_laststage_accuracy': prec1, 'test_loss1': loss1, 'test_loss2':loss2, 'test_loss3': loss3, 'test_loss4':loss})
+        # wandb.log({'test_laststage_accuracy': prec1, 'test_loss1': loss1, 'test_loss2':loss2, 'test_loss3': loss3, 'test_loss4':loss})
 
         if (i+1) % args.print_freq == 0:
             fd = open(record_file, 'a+')
@@ -564,7 +588,7 @@ def validate(val_loader, model, fc, criterion, epoch):
     fd.close()
     val_acc.append(top1.ave)
 
-    return top1.ave, losses.ave
+    return top1.ave, losses1.ave, losses2.ave, losses3.ave, losses.ave, avglosses.ave
 
 class Full_layer(torch.nn.Module):
     '''explicitly define the full connected layer'''
