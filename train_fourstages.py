@@ -244,7 +244,7 @@ def main():
     
     wandb.init(project="test-project", config = args, group = 'localized_train')
     time1 = time.localtime()
-    wandb.run.name = 'Resnet_56_fourstages'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.run.name = 'Resnet_56_fourstages_klnew'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     wandb.define_metric("train_loss1", summary="min")
     wandb.define_metric('train_loss2', summary='min')
     wandb.define_metric('train_loss3', summary='min')
@@ -466,7 +466,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
         features, loss1, loss2, loss3 = model.module.stagetrain4(input_var, feature1_var, feature2_var, feature3_var) 
         output = fc(features)
         if args.kl_div:
-            loss = F.kl_div(F.log_softmax(output.data,dim=-1), output_data.softmax(dim=-1),  reduction='batchmean').cuda()
+            loss = F.kl_div(F.log_softmax(output,dim=-1), output_data.softmax(dim=-1),  reduction='batchmean').cuda()
             # loss = F.kl_div(output.data.softmax(dim=-1), output_data.softmax(dim=-1).log(), reduction='batchmean').cuda()
         else:
             loss = criterion(output, target_var)
@@ -544,7 +544,7 @@ def validate(val_loader, model, fc, criterion, epoch):
             output = fc(features)
 
         if args.kl_div:
-            loss = F.kl_div(F.log_softmax(output.data,dim=-1), output_data.softmax(dim=-1),  reduction='batchmean').cuda()
+            loss = F.kl_div(F.log_softmax(output, dim=-1), output_data.softmax(dim=-1),  reduction='batchmean').cuda()
             # loss = F.kl_div(output.data.softmax(dim=-1), F.log_softmax(output_data,dim=-1), reduction='batchmean').cuda()
         else:
             loss = criterion(output, target_var)
