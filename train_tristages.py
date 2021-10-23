@@ -466,7 +466,8 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
         features, loss1, loss2 = model.module.stagetrain3(input_var, feature1_var, feature2_var) 
         output = fc(features)
         if args.kl_div:
-            loss = F.kl_div(output_data.softmax(dim=-1).log(), output.softmax(dim=-1), reduction='batchmean').cuda()
+            loss = F.kl_div(F.log_softmax(output.data,dim=-1), output_data.softmax(dim=-1),  reduction='batchmean').cuda()
+            # loss = F.kl_div(output.data.softmax(dim=-1), F.log_softmax(output_data,dim=-1), reduction='batchmean').cuda()
         else:
             loss = criterion(output, target_var)
         # measure accuracy and record loss
@@ -534,7 +535,8 @@ def validate(val_loader, model, fc, criterion, epoch):
             output = fc(features)
 
         if args.kl_div:
-            loss = F.kl_div(output_data.softmax(dim=-1).log(), output.softmax(dim=-1), reduction='batchmean').cuda()
+            # F.log_softmax(output_data,dim=-1)
+            loss = F.kl_div(F.log_softmax(output.data,dim=-1), output_data.softmax(dim=-1),  reduction='batchmean').cuda()
         else:
             loss = criterion(output, target_var)
 
