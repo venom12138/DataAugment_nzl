@@ -86,6 +86,10 @@ parser.add_argument('--bn-size', default=4, type=int,
 parser.add_argument('--alpha', default=200, type=int,
                     help='hyper-parameter alpha for shake_pyramidnet')
 
+parser.add_argument('--optimizer_resume', dest='optimizer_resume', action='store_true',
+                    help='whether to use optimizer_resume')
+parser.set_defaults(optimizer_resume=False)
+
 # Autoaugment
 parser.add_argument('--autoaugment', dest='autoaugment', action='store_true',
                     help='whether to use autoaugment')
@@ -239,9 +243,9 @@ def main():
 
     global class_num
     
-    wandb.init(project="test-project", config = args)
+    wandb.init(project="test-project", config = args, group = 'finetune')
     time1 = time.localtime()
-    wandb.run.name = 'Resnet_50_fourstages_finetune'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.run.name = 'Resnet_56_tristages_finetune'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     wandb.define_metric("train_loss1", summary="min")
     wandb.define_metric('train_loss2', summary='min')
     wandb.define_metric('train_loss3', summary='min')
@@ -400,7 +404,8 @@ def main():
         start_epoch = 0 # checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         fc.load_state_dict(checkpoint['fc'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        if args.optimizer_resume:
+            optimizer.load_state_dict(checkpoint['optimizer'])
         # isda_criterion = checkpoint['isda_criterion']
         # val_acc = checkpoint['val_acc']
         # best_prec1 = checkpoint['best_acc']
