@@ -246,14 +246,8 @@ def main():
     wandb.init(project="test-project", config = args, group = 'finetune')
     time1 = time.localtime()
     wandb.run.name = 'Resnet_56_tristages_finetune'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
-    wandb.define_metric("train_loss1", summary="min")
-    wandb.define_metric('train_loss2', summary='min')
-    wandb.define_metric('train_loss3', summary='min')
-    wandb.define_metric('test_loss1', summary='min')
-    wandb.define_metric('test_loss2', summary='min')
-    wandb.define_metric('test_loss3', summary='min')
-    wandb.define_metric('test_laststage_accuracy', summary='max')
-    wandb.define_metric('train_laststage_accuracy', summary='max')
+    wandb.define_metric('test_accuracy', summary='max')
+    wandb.define_metric('train_accuracy', summary='max')
     class_num = args.dataset == 'cifar10' and 10 or 100
 
     normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
@@ -418,9 +412,12 @@ def main():
         adjust_learning_rate(optimizer, epoch + 1)
 
         # train for one epoch
-        train(train_loader, model, fc, ce_criterion, optimizer, epoch)
-        prec1, avg_loss = validate(val_loader, model, fc, ce_criterion, epoch)
-        wandb.log({'test_accuracy': prec1})
+        acc_train, train_loss = train(train_loader, model, fc, ce_criterion, optimizer, epoch)
+        prec1, test_loss = validate(val_loader, model, fc, ce_criterion, epoch)
+        wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']},commit = False)
+        wandb.log({'test_accuracy': prec1, 'train_accuracy': acc_train, 'test_loss': test_loss, 'train_loss':train_loss})
+        
+        # wandb.log({'test_accuracy': prec1})
         is_best = prec1 > best_prec1
         min_loss = max(best_prec1, prec1)
         save_checkpoint({
@@ -448,7 +445,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
     fc.train()
 
     end = time.time()
-    wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
+    # wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
     for i, (x, target) in enumerate(train_loader):
         target = target.cuda()
         x = x.cuda()
@@ -478,7 +475,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'train_accuracy': prec1})
+        # wandb.log({'train_accuracy': prec1})
 
         if (i+1) % args.print_freq == 0:
             # print(discriminate_weights)
@@ -493,7 +490,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
             print(string)
             fd.write(string + '\n')
             fd.close()
-
+    return top1.ave, losses.ave
 
 def validate(val_loader, model, fc, criterion, epoch):
     """Perform validation on the validation set"""

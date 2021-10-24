@@ -240,7 +240,8 @@ def main():
     wandb.init(project="test-project", config = args)
     time1 = time.localtime()
     wandb.run.name = 'feature_extract'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
-    
+    wandb.define_metric('test_accuracy', summary='max')
+    wandb.define_metric('train_accuracy', summary='max')
     class_num = args.dataset == 'cifar10' and 10 or 100
 
     normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
@@ -405,11 +406,15 @@ def main():
 
         # evaluate on validation set
         prec1 = validate(val_loader, model, fc, ce_criterion, epoch)
-
+        acc_train, train_loss = train(train_loader, model, fc, ce_criterion, optimizer, epoch)
+        acc_test, test_loss = validate(val_loader, model, fc, ce_criterion, epoch)
+        wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']},commit = False)
+        wandb.log({'test_accuracy': acc_test, 'train_accuracy': acc_train, 'test_loss': test_loss, 'train_loss':train_loss})
+        
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
         best_prec1 = max(prec1, best_prec1)
-        wandb.log({'best_accuracy': best_prec1})
+        # wandb.log({'best_accuracy': best_prec1})
         save_checkpoint({
             'epoch': epoch + 1,
             'state_dict': model.state_dict(),
@@ -443,7 +448,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
     fc.train()
 
     end = time.time()
-    wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
+    # wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']})
     for i, (x, target) in enumerate(train_loader):
         target = target.cuda()
         x = x.cuda()
@@ -468,7 +473,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
 
         batch_time.update(time.time() - end)
         end = time.time()
-        wandb.log({'train_accuracy': prec1, 'loss': loss})
+        # wandb.log({'train_accuracy': prec1, 'loss': loss})
 
         if (i+1) % args.print_freq == 0:
             # print(discriminate_weights)
@@ -483,7 +488,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
             print(string)
             fd.write(string + '\n')
             fd.close()
-
+    return top1.ave, losses.ave
 
 def validate(val_loader, model, fc, criterion, epoch):
     """Perform validation on the validation set"""
@@ -545,7 +550,7 @@ def validate(val_loader, model, fc, criterion, epoch):
     fd.close()
     val_acc.append(top1.ave)
 
-    return top1.ave
+    return top1.ave, losses.ave
 
 class Full_layer(torch.nn.Module):
     '''explicitly define the full connected layer'''
