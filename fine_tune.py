@@ -109,6 +109,9 @@ parser.add_argument('--cos_lr', dest='cos_lr', action='store_true',
                     help='whether to use cosine learning rate')
 parser.set_defaults(cos_lr=False)
 
+parser.add_argument('--Commit', default='', type=str,
+                    help='current commit')
+
 args = parser.parse_args()
 
 
