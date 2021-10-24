@@ -116,10 +116,10 @@ args = parser.parse_args()
 # (specialized for each type of models)
 training_configurations = {
     'resnet': {
-        'epochs': 100,
+        'epochs': 30,
         'batch_size': 128,
         'initial_learning_rate': 0.1,
-        'changing_lr': [80, 120],
+        'changing_lr': [20, 120],
         'lr_decay_rate': 0.1,
         'momentum': 0.9,
         'nesterov': True,
@@ -245,7 +245,7 @@ def main():
     
     wandb.init(project="test-project", config = args, group = 'finetune')
     time1 = time.localtime()
-    wandb.run.name = 'Resnet_56_tristages_finetune'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.run.name = 'Resnet_56_tristages_finetune30eps'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     wandb.define_metric('test_accuracy', summary='max')
     wandb.define_metric('train_accuracy', summary='max')
     class_num = args.dataset == 'cifar10' and 10 or 100

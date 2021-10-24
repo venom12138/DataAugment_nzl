@@ -112,10 +112,10 @@ args = parser.parse_args()
 # (specialized for each type of models)
 training_configurations = {
     'resnet': {
-        'epochs': 160,
+        'epochs': 30,
         'batch_size': 128,
         'initial_learning_rate': 0.1,
-        'changing_lr': [80, 120],
+        'changing_lr': [20, 120],
         'lr_decay_rate': 0.1,
         'momentum': 0.9,
         'nesterov': True,
@@ -239,7 +239,7 @@ def main():
     
     wandb.init(project="test-project", config = args)
     time1 = time.localtime()
-    wandb.run.name = 'feature_extract'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
+    wandb.run.name = 'Resnet_56_baseline_30eps'+str(time1.tm_year)+str(time1.tm_mon)+str(time1.tm_mday)+str(time1.tm_hour)+str(time1.tm_min)
     wandb.define_metric('test_accuracy', summary='max')
     wandb.define_metric('train_accuracy', summary='max')
     class_num = args.dataset == 'cifar10' and 10 or 100
@@ -402,14 +402,14 @@ def main():
         adjust_learning_rate(optimizer, epoch + 1)
 
         # train for one epoch
-        train(train_loader, model, fc, ce_criterion, optimizer, epoch)
+        # train(train_loader, model, fc, ce_criterion, optimizer, epoch)
 
         # evaluate on validation set
-        prec1 = validate(val_loader, model, fc, ce_criterion, epoch)
+        # prec1 = validate(val_loader, model, fc, ce_criterion, epoch)
         acc_train, train_loss = train(train_loader, model, fc, ce_criterion, optimizer, epoch)
-        acc_test, test_loss = validate(val_loader, model, fc, ce_criterion, epoch)
+        prec1, test_loss = validate(val_loader, model, fc, ce_criterion, epoch)
         wandb.log({'epoch':epoch, 'lr':optimizer.state_dict()['param_groups'][0]['lr']},commit = False)
-        wandb.log({'test_accuracy': acc_test, 'train_accuracy': acc_train, 'test_loss': test_loss, 'train_loss':train_loss})
+        wandb.log({'test_accuracy': prec1, 'train_accuracy': acc_train, 'test_loss': test_loss, 'train_loss':train_loss})
         
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
