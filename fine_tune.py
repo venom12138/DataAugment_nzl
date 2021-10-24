@@ -469,6 +469,7 @@ def train(train_loader, model, fc, criterion, optimizer, epoch):
         top1.update(prec1.item(), x.size(0))
 
         # compute gradient and do SGD step
+        
         loss.backward()
 
         optimizer.step()
