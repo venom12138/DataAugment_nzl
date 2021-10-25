@@ -4,10 +4,13 @@ Reference:
 [1] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning for image recognition. In CVPR, 2016.
 [2] K. He, X. Zhang, S. Ren, and J. Sun. Identity mappings in deep residual networks. In ECCV, 2016.
 '''
+import copy
 
+from .losses import SupConLoss
 import torch
 import torch.nn as nn
 import math
+from torch.nn import functional as F
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -159,10 +162,229 @@ class PreActBottleneck(nn.Module):
 
         return out
 
+class AuxClassifier(nn.Module):
+    def __init__(self, inplanes, net_config='1c2f', loss_mode='contrast', class_num=10, widen=1, feature_dim=128):
+        super(AuxClassifier, self).__init__()
+
+        assert inplanes in [16, 32, 64]
+        assert net_config in ['0c1f', '0c2f', '1c1f', '1c2f', '1c3f', '2c2f']
+        assert loss_mode in ['contrast', 'cross_entropy']
+
+        self.loss_mode = loss_mode
+        self.feature_dim = feature_dim
+
+        if loss_mode == 'contrast':
+            self.criterion = SupConLoss()
+            self.fc_out_channels = feature_dim
+        elif loss_mode == 'cross_entropy':
+            self.criterion = nn.CrossEntropyLoss()
+            self.fc_out_channels = class_num
+        else:
+            raise NotImplementedError
+
+        if net_config == '0c1f':  # Greedy Supervised Learning (Greedy SL)
+            self.head = nn.Sequential(
+                nn.AdaptiveAvgPool2d((1, 1)),
+                nn.Flatten(),
+                nn.Linear(inplanes, self.fc_out_channels),
+            )
+
+        if net_config == '0c2f':
+            if inplanes == 16:
+                self.head = nn.Sequential(
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(16, int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+            elif inplanes == 32:
+                self.head = nn.Sequential(
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(32, int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+            elif inplanes == 64:
+                self.head = nn.Sequential(
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(64, int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+
+        if net_config == '1c1f':
+            if inplanes == 16:
+                self.head = nn.Sequential(
+                    nn.Conv2d(16, int(32 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                    nn.BatchNorm2d(int(32 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(32 * widen), self.fc_out_channels),
+                )
+            elif inplanes == 32:
+                self.head = nn.Sequential(
+                    nn.Conv2d(32, int(64 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(64 * widen), self.fc_out_channels),
+                )
+            elif inplanes == 64:
+                self.head = nn.Sequential(
+                    nn.Conv2d(64, int(64 * widen), kernel_size=3, stride=1, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(64 * widen), self.fc_out_channels),
+                )
+
+        if net_config == '1c2f':
+            if inplanes == 16:
+                self.head = nn.Sequential(
+                    nn.Conv2d(16, int(32 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                    nn.BatchNorm2d(int(32 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(32 * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+            elif inplanes == 32:
+                self.head = nn.Sequential(
+                    nn.Conv2d(32, int(64 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(64 * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+            elif inplanes == 64:
+                self.head = nn.Sequential(
+                    nn.Conv2d(64, int(64 * widen), kernel_size=3, stride=1, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(64 * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+
+        if net_config == '1c3f':
+            if inplanes == 16:
+                self.head = nn.Sequential(
+                    nn.Conv2d(16, int(32 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                    nn.BatchNorm2d(int(32 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(32 * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+            elif inplanes == 32:
+                self.head = nn.Sequential(
+                    nn.Conv2d(32, int(64 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(64 * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+            elif inplanes == 64:
+                self.head = nn.Sequential(
+                    nn.Conv2d(64, int(64 * widen), kernel_size=3, stride=1, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(64 * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+
+        if net_config == '2c2f':
+            if inplanes == 16:
+                self.head = nn.Sequential(
+                    nn.Conv2d(16, int(32 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                    nn.BatchNorm2d(int(32 * widen)),
+                    nn.ReLU(),
+                    nn.Conv2d(int(32 * widen), int(32 * widen), kernel_size=3, stride=1, padding=1, bias=False),
+                    nn.BatchNorm2d(int(32 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(32 * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+            elif inplanes == 32:
+                self.head = nn.Sequential(
+                    nn.Conv2d(32, int(64 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.Conv2d(int(64 * widen), int(64 * widen), kernel_size=3, stride=1, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(64 * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+            elif inplanes == 64:
+                self.head = nn.Sequential(
+                    nn.Conv2d(64, int(64 * widen), kernel_size=3, stride=1, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.Conv2d(int(64 * widen), int(64 * widen), kernel_size=3, stride=1, padding=1, bias=False),
+                    nn.BatchNorm2d(int(64 * widen)),
+                    nn.ReLU(),
+                    nn.AdaptiveAvgPool2d((1, 1)),
+                    nn.Flatten(),
+                    nn.Linear(int(64 * widen), int(feature_dim * widen)),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(int(feature_dim * widen), self.fc_out_channels)
+                )
+
+    def forward(self, x):
+
+        features = self.head(x)
+
+        # if self.loss_mode == 'contrast':
+        #     assert features.size(1) == self.feature_dim
+        #     features = F.normalize(features, dim=1)
+        #     features = features.unsqueeze(1)
+        #     loss = self.criterion(features, target, temperature=0.07)
+        # elif self.loss_mode == 'cross_entropy':
+        #     loss = self.criterion(features, target)
+        # else:
+        #     raise NotImplementedError
+
+        return features
+
 
 class ResNet_Cifar(nn.Module):
 
-    def __init__(self, block, layers, dropout_rate=0):
+    def __init__(self, block, layers, dropout_rate=0, class_num=10, stage=None
+                 , aux_config=None):
         super(ResNet_Cifar, self).__init__()
         self.inplanes = 16
         self.dropout_rate = dropout_rate
@@ -173,11 +395,20 @@ class ResNet_Cifar(nn.Module):
         self.layer1 = self._make_layer(block, 16, layers[0])
         self.layer2 = self._make_layer(block, 32, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 64, layers[2], stride=2)
-        self.avgpool = nn.AvgPool2d(8, stride=1)
 
-
-        # self.kkk = torch.nn.Linear(64, 2)
-        # self.fc = nn.Linear(64 * block.expansion, num_classes)
+        self.stage = stage
+        if aux_config:
+            if stage == 1:
+                aux_inplanes = 16
+            elif stage == 2:
+                aux_inplanes = 32
+            elif stage == 3:
+                aux_inplanes = 64
+            self.aux_classifier = AuxClassifier(inplanes=aux_inplanes, net_config=aux_config,
+                                                loss_mode='cross_entropy', class_num=class_num,
+                                                )
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(64 * block.expansion, class_num)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -204,224 +435,51 @@ class ResNet_Cifar(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
+        if self.stage == None:
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
 
-        x = self.layer1(x) # feature map1
-        x = self.layer2(x) # feature map2
-        x = self.layer3(x)
+            x = self.layer1(x)
+            x = self.layer2(x)
+            x = self.layer3(x)
 
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
+            x = self.avgpool(x)
+            x = x.view(x.size(0), -1)
+            output = self.fc(x)
+        elif self.stage == 1:
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.layer1(x)
+            output = self.aux_classifier(x)
+        elif self.stage == 2:
+            x = self.layer2(x)
+            output = self.aux_classifier(x)
+        elif self.stage == 3:
+            x = self.layer3(x)
+            x = self.avgpool(x)
+            x = x.view(x.size(0), -1)
+            output = self.fc(x)
 
-        return x
-    
-    def gen_feature(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
+        return output
 
-        feat1 = self.layer1(x) # feature map1
-        feat2 = self.layer2(feat1) # feature map2
-        feat3 = self.layer3(feat2)
-
-        x = self.avgpool(feat3)
-        x = x.view(x.size(0), -1)
-
-        return x, feat1, feat2, feat3
-
-    def stagetrain4(self, x, feature1, feature2, feature3):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-
-        x = self.layer1(x)
-        
-        criterion = nn.MSELoss()
-        loss1 = criterion(x, feature1)
-        
-        loss1.backward()
-        
-        x = self.layer2(feature1)
-        loss2 = criterion(feature2, x)
-        loss2.backward()
-        
-        x = self.layer3(feature2)
-        loss3 = criterion(feature3, x)
-        loss3.backward()
-        
-        x = self.avgpool(feature3)
-        x = x.view(x.size(0), -1)
-        return x, loss1, loss2, loss3
-    
-    def stagetrain3(self, x, feature1, feature2):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-
-        x = self.layer1(x)
-        
-        criterion = nn.MSELoss()
-        loss1 = criterion(x, feature1)
-        loss1.backward()
-        
-        x = self.layer2(feature1)
-        loss2 = criterion(feature2, x)
-        loss2.backward()
-        
-        x = self.layer3(feature2)
-        # loss3 = criterion(feature3, x)
-        # loss3.backward()
-        
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        return x, loss1, loss2 # , loss3
-    
-    def stagetest4(self, x, feature1, feature2, feature3):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-
-        x = self.layer1(x)
-        
-        criterion = nn.MSELoss()
-        loss1 = criterion(x, feature1)
-        
-        x = self.layer2(feature1)
-        loss2 = criterion(feature2, x)
-        
-        x = self.layer3(feature2)
-        loss3 = criterion(feature3, x)
-        
-        x = self.avgpool(feature3)
-        x = x.view(x.size(0), -1)
-        return x, loss1, loss2, loss3
-    
-    def stagetest3(self, x, feature1, feature2):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-
-        x = self.layer1(x)
-        
-        criterion = nn.MSELoss()
-        loss1 = criterion(x, feature1)
-        
-        x = self.layer2(feature1)
-        loss2 = criterion(feature2, x)
-        
-        x = self.layer3(feature2)
-        # loss3 = criterion(feature3, x)
-        
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        return x, loss1, loss2# , loss3
-
-class ResNet_MNIST(nn.Module):
-
-    def __init__(self, block, layers, num_classes=10):
-        super(ResNet_MNIST, self).__init__()
-        self.inplanes = 16
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.relu = nn.ReLU(inplace=True)
-        self.layer1 = self._make_layer(block, 16, layers[0])
-        self.layer2 = self._make_layer(block, 32, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 64, layers[2], stride=2)
-        self.avgpool = nn.AvgPool2d(8, stride=1)
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-
-    def _make_layer(self, block, planes, blocks, stride=1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion)
-            )
-
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
-        self.inplanes = planes * block.expansion
-        for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-
-
-
-        return x
-
-
-class PreAct_ResNet_Cifar(nn.Module):
-
-    def __init__(self, block, layers, num_classes=10):
-        super(PreAct_ResNet_Cifar, self).__init__()
-        self.inplanes = 16
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
-        self.layer1 = self._make_layer(block, 16, layers[0])
-        self.layer2 = self._make_layer(block, 32, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 64, layers[2], stride=2)
-        self.bn = nn.BatchNorm2d(64*block.expansion)
-        self.relu = nn.ReLU(inplace=True)
-        self.avgpool = nn.AvgPool2d(8, stride=1)
-        self.fc = nn.Linear(64*block.expansion, num_classes)
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-
-    def _make_layer(self, block, planes, blocks, stride=1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes*block.expansion:
-            downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes*block.expansion, kernel_size=1, stride=stride, bias=False)
-            )
-
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
-        self.inplanes = planes*block.expansion
-        for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        x = self.conv1(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-
-        x = self.bn(x)
-        x = self.relu(x)
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-
-        return x
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
+        state_dict = nn.Module.state_dict(self)
+        keys = list(state_dict.keys())
+        if self.stage is not None:
+            for k in keys:
+                if self.stage == 1:
+                    if k.startswith('conv1') or k.startswith('bn1') or k.startswith('layer1'):
+                        continue
+                elif self.stage == 2:
+                    if k.startswith('layer2'):
+                        continue
+                elif self.stage == 3:
+                    if k.startswith('layer3') or k.startswith('fc'):
+                        continue
+                state_dict.pop(k)
+        return state_dict
 
 
 def resnet20_cifar(**kwargs):

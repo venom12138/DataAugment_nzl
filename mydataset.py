@@ -55,10 +55,11 @@ class myCIFAR10(VisionDataset):
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
             download: bool = False,
+            stage: int = None,
     ) -> None:
 
         super(myCIFAR10, self).__init__(root, transform=transform,
-                                    target_transform=target_transform)
+                                        target_transform=target_transform)
 
         self.train = train  # training set or test set
 
@@ -67,7 +68,7 @@ class myCIFAR10(VisionDataset):
 
         if not self._check_integrity():
             raise RuntimeError('Dataset not found or corrupted.' +
-                            ' You can use download=True to download it')
+                               ' You can use download=True to download it')
 
         if self.train:
             downloaded_list = self.train_list
@@ -88,29 +89,16 @@ class myCIFAR10(VisionDataset):
                 else:
                     self.targets.extend(entry['fine_labels'])
 
-        self.data = np.vstack(self.data).reshape(-1, 3, 32, 32)
-        self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
-        self.feature_path = feature_path
-        self.feature1 = []
-        self.feature2 = []
-        self.feature3 = []
-        self.output_data =[]
-        # print(len(os.listdir(feature_path+'/feature1')))
-        # for i in range(3):
-        if self.train:
-            self.feature1 = np.load(feature_path+'/train/train_feature1.npy', 'r')
-            self.feature2 = np.load(feature_path+'/train/train_feature2.npy', 'r')
-            self.feature3 = np.load(feature_path+'/train/train_feature3.npy', 'r')
-            self.output_data = np.load(feature_path+'/train/train_output.npy', 'r')
+        self.stage = stage
+        if stage is None or stage == 1:
+            self.data = np.vstack(self.data).reshape(-1, 3, 32, 32)
+            self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
         else:
-            self.feature1 = np.load(feature_path+'/test/test_feature1.npy', 'r')
-            self.feature2 = np.load(feature_path+'/test/test_feature2.npy', 'r')
-            self.feature3 = np.load(feature_path+'/test/test_feature3.npy', 'r')
-            self.output_data = np.load(feature_path+'/test/test_output.npy', 'r')
-        print(self.feature1.shape)
-        print(self.feature2.shape)
-        print(self.feature3.shape)
-        print(self.output_data.shape)
+            if self.train:
+                self.data = np.load(feature_path+f'/train/train_feature{stage-1}.npy', 'r')
+            else:
+                self.data = np.load(feature_path+f'/test/test_feature{stage-1}.npy', 'r')
+        print('Data shape:', self.data.shape)
         self._load_meta()
 
     def _load_meta(self) -> None:
@@ -131,27 +119,21 @@ class myCIFAR10(VisionDataset):
         Returns:
             tuple: (image, target) where target is index of the target class.
         """
-        img, target, feature1, feature2, feature3, output_data= self.data[index], self.targets[index], self.feature1[index], self.feature2[index], self.feature3[index],self.output_data[index]
-        # feature1 = np.load(self.feature_path+'/feature1/'+str(index)+'.npy', 'r').squeeze()
-        # feature2 = np.load(self.feature_path+'/feature2/'+str(index)+'.npy', 'r').squeeze()
-        # feature3 = np.load(self.feature_path+'/feature3/'+str(index)+'.npy', 'r').squeeze()
-        
-        feature1 = np.require(feature1, dtype='float32', requirements=['O', 'W'])
-        feature2 = np.require(feature2, dtype='float32', requirements=['O', 'W'])
-        feature3 = np.require(feature3, dtype='float32', requirements=['O', 'W'])
-        output_data = np.require(output_data, dtype='float32', requirements=['O', 'W'])
-        # print(feature1.shape)
-        # doing this so that it is consistent with all other datasets
-        # to return a PIL Image
-        img = Image.fromarray(img)
+        img, target = self.data[index], self.targets[index]
 
-        if self.transform is not None:
-            img = self.transform(img)
+        if self.stage is None or self.stage == 1:
+            # doing this so that it is consistent with all other datasets
+            # to return a PIL Image
+            img = Image.fromarray(img)
 
-        if self.target_transform is not None:
-            target = self.target_transform(target)
+            if self.transform is not None:
+                img = self.transform(img)
 
-        return img, target, feature1, feature2, feature3, output_data
+            if self.target_transform is not None:
+                target = self.target_transform(target)
+        else:
+            img = np.require(img, dtype='float32', requirements=['O', 'W'])
+        return img, target
 
     def __len__(self) -> int:
         return len(self.data)
