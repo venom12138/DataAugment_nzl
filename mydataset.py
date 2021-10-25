@@ -95,9 +95,9 @@ class myCIFAR10(VisionDataset):
             self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
         else:
             if self.train:
-                self.data = np.load(feature_path+f'/train/train_feature{stage-1}.npy', 'r')
+                self.data = np.load(feature_path+f'/train/train_feature{stage-1}.npy').astype(np.float32)
             else:
-                self.data = np.load(feature_path+f'/test/test_feature{stage-1}.npy', 'r')
+                self.data = np.load(feature_path+f'/test/test_feature{stage-1}.npy').astype(np.float32)
         print('Data shape:', self.data.shape)
         self._load_meta()
 
@@ -131,8 +131,6 @@ class myCIFAR10(VisionDataset):
 
             if self.target_transform is not None:
                 target = self.target_transform(target)
-        else:
-            img = np.require(img, dtype='float32', requirements=['O', 'W'])
         return img, target
 
     def __len__(self) -> int:
