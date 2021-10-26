@@ -60,7 +60,7 @@ parser.add_argument('--local_module_ckpt', type=str, default='')
 
 parser.add_argument('--epochs', type=int, default=160)
 parser.add_argument('--initial_learning_rate', type=float, default=0.1)
-parser.add_argument('--changing_lr', type=list, default=[80, 120])
+parser.add_argument('--changing_lr', type=int, nargs="+", default=[80, 120])
 
 parser.add_argument('--stage', type=int, default=None)  # None: baseline
 parser.add_argument('--aux_config', type=str, default=None)
