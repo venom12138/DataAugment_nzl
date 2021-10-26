@@ -55,10 +55,13 @@ parser.set_defaults(cos_lr=False)
 parser.add_argument('--en_wandb', action='store_true')
 
 parser.add_argument('--finetune', type=int, default=0)
+parser.add_argument('--optim_ckpt', type=str, default='')
 parser.add_argument('--local_module_ckpt', type=str, default='')
+
 parser.add_argument('--epochs', type=int, default=160)
 parser.add_argument('--initial_learning_rate', type=float, default=0.1)
-parser.add_argument('--changing_lr', type=list, default=[80, 120])
+parser.add_argument('--changing_lr', type=int, nargs="+", default=[80, 120])
+
 parser.add_argument('--stage', type=int, default=None)  # None: baseline
 parser.add_argument('--aux_config', type=str, default=None)
 
@@ -145,21 +148,12 @@ def main():
                                 weight_decay=training_configurations[args.model]['weight_decay'])
 
     model = model.cuda()
-    # if args.resume:
-    #     # Load checkpoint.
-    #     print('==> Resuming from checkpoint..')
-    #     assert os.path.isfile(args.resume), 'Error: no checkpoint directory found!'
-    #     checkpoint = torch.load(args.resume)
-    #     start_epoch = checkpoint['epoch']
-    #     model.load_state_dict(checkpoint['state_dict'])
-    #     optimizer.load_state_dict(checkpoint['optimizer'])
-    #     isda_criterion = checkpoint['isda_criterion']
-    #     best_prec1 = checkpoint['best_acc']
     if args.finetune:
-        checkpoint = torch.load(args.finetune)
+        optim_checkpoint = torch.load(args.optim_ckpt)
+        checkpoint = torch.load(args.local_module_ckpt)
+        model.load_state_dict(optim_checkpoint['state_dict'])
         model.load_state_dict(checkpoint['state_dict'], strict=False)
-        # model.load_state_dict(optim_checkpoint['state_dict'], strict=False)
-        best_prec1 = checkpoint['best_acc']
+        start_epoch = 0
     else:
         start_epoch = 0
 
