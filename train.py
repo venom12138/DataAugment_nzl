@@ -81,8 +81,9 @@ def main():
     exp = ExpHandler(args.en_wandb)
     exp.save_config(args)
 
-    wandb.define_metric('eval_top1', summary='max')
-    wandb.define_metric('epoch_time', hidden=True)
+    if args.en_wandb:
+        wandb.define_metric('eval_top1', summary='max')
+        wandb.define_metric('epoch_time', hidden=True)
 
     best_prec1 = 0
 
