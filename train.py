@@ -12,6 +12,8 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.utils.data
+import wandb
+
 import transforms
 import torchvision.datasets as datasets
 import networks.resnet
@@ -78,6 +80,10 @@ def main():
     global best_prec1, exp
     exp = ExpHandler(args.en_wandb)
     exp.save_config(args)
+
+    wandb.define_metric('eval_top1', summary='max')
+    wandb.define_metric('epoch_time', hidden=True)
+
     best_prec1 = 0
 
     global class_num
