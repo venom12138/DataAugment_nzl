@@ -64,7 +64,8 @@ parser.add_argument('--changing_lr', type=int, nargs="+", default=[80, 120])
 
 parser.add_argument('--stage', type=int, default=None)  # None: baseline
 parser.add_argument('--aux_config', type=str, default=None)
-
+parser.add_argument('--mix_epoch', type=int, default=10000, help = 'train stage within mixepoch then train all stages')
+parser.add_argument('--mix_mode', type=str, default='', help = 'stochastic or optim')
 args = parser.parse_args()
 
 # Configurations adopted for training deep networks.
@@ -161,6 +162,14 @@ def main():
         start_time = time.time()
         adjust_learning_rate(optimizer, epoch + 1)
 
+        if epoch == args.mix_epoch:
+            if args.mix_mode == 'stochastic':
+                model.stage = None
+            elif args.mix_mode == 'optim':
+                optim_checkpoint = torch.load(args.optim_ckpt)
+                checkpoint = torch.load(exp.save_dir+'checkpoint.pth.tar')
+                model.load_state_dict(optim_checkpoint['state_dict'])
+                model.load_state_dict(checkpoint['state_dict'], strict=False)
         # train for one epoch
         train_metrics = train(train_loader, model, ce_criterion, optimizer, epoch)
 
