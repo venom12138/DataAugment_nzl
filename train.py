@@ -170,6 +170,7 @@ def main():
                 checkpoint = torch.load(exp.save_dir+'checkpoint.pth.tar')
                 model.load_state_dict(optim_checkpoint['state_dict'])
                 model.load_state_dict(checkpoint['state_dict'], strict=False)
+                model.stage = None
         # train for one epoch
         train_metrics = train(train_loader, model, ce_criterion, optimizer, epoch)
 
