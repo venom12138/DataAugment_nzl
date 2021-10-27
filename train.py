@@ -55,7 +55,7 @@ parser.set_defaults(cos_lr=False)
 parser.add_argument('--en_wandb', action='store_true')
 
 parser.add_argument('--finetune', type=int, default=0)
-parser.add_argument('--optim_ckpt', type=str, default='')
+parser.add_argument('--optim_ckpt', type=str, default='') # ?
 parser.add_argument('--local_module_ckpt', type=str, default='')
 
 parser.add_argument('--epochs', type=int, default=160)
