@@ -167,9 +167,11 @@ def main():
                 model.stage = None
             elif args.mix_mode == 'optim':
                 optim_checkpoint = torch.load(args.optim_ckpt)
-                checkpoint = torch.load(exp.save_dir+'checkpoint.pth.tar')
+                if epoch != 0:
+                    checkpoint = torch.load(exp.save_dir+'/checkpoint.pth.tar')
                 model.load_state_dict(optim_checkpoint['state_dict'])
-                model.load_state_dict(checkpoint['state_dict'], strict=False)
+                if epoch != 0:
+                    model.load_state_dict(checkpoint['state_dict'], strict=False)
                 model.stage = None
         # train for one epoch
         train_metrics = train(train_loader, model, ce_criterion, optimizer, epoch)
