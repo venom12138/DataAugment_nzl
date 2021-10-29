@@ -110,7 +110,7 @@ def main():
     plt.figure()
     plt.plot(t,lr)
     plt.show()
-    plt.savefig('./lr1.png')
+    plt.savefig('./lr2.png')
 
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate"""

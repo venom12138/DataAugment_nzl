@@ -163,7 +163,7 @@ def main():
         adjust_learning_rate(optimizer, epoch + 1)
 
         if epoch == args.mix_epoch:
-            if args.mix_mode == 'stochastic':
+            if args.mix_mode == 'random':
                 model.stage = None
             elif args.mix_mode == 'optim':
                 optim_checkpoint = torch.load(args.optim_ckpt)
