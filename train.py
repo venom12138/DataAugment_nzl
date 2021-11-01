@@ -72,6 +72,7 @@ training_configurations = {
         'epochs': 160,
         'batch_size': 128,
         'initial_learning_rate': 0.1,
+        'changing_lr': [80, 120],
         'lr_decay_rate': 0.1,
         'momentum': 0.9,
         'nesterov': True,
