@@ -397,14 +397,9 @@ class ResNet_Cifar(nn.Module):
         self.layer3 = self._make_layer(block, 64, layers[2], stride=2)
 
         self.stage = stage
-        if aux_config:
-            if stage == 1:
-                aux_inplanes = 16
-            elif stage == 2:
-                aux_inplanes = 32
-            elif stage == 3:
-                aux_inplanes = 64
-            self.aux_classifier = AuxClassifier(inplanes=aux_inplanes, net_config=aux_config,
+        if stage == 1 or stage == 2:
+            assert aux_config is not None
+            self.aux_classifier = AuxClassifier(inplanes=16 if stage == 1 else 32, net_config=aux_config,
                                                 loss_mode='cross_entropy', class_num=class_num,
                                                 )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
