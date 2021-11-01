@@ -81,15 +81,14 @@ class ExpHandler:
         if self._en_wandb:
             wandb.config.update(conf)
 
-    def write(self, epoch, eval_metrics=None, train_metrics=None, **kwargs):
-        rowd = OrderedDict(epoch=epoch)
-        rowd.update(kwargs)
+    def write(self, prefix, eval_metrics=None, train_metrics=None, **kwargs):
+        rowd = OrderedDict([(f'{prefix}/{k}', v) for k, v in kwargs.items() ])
         if eval_metrics:
-            rowd.update([('eval_' + k, v) for k, v in eval_metrics.items()])
+            rowd.update([(f'{prefix}/eval_' + k, v) for k, v in eval_metrics.items()])
         if train_metrics:
-            rowd.update([('train_' + k, v) for k, v in train_metrics.items()])
+            rowd.update([(f'{prefix}/train_' + k, v) for k, v in train_metrics.items()])
 
-        path = os.path.join(self._save_dir, f'{self._exp_id}_summary.csv')
+        path = os.path.join(self._save_dir, f'{self._exp_id}_{prefix}_summary.csv')
         initial = not os.path.exists(path)
         with open(path, mode='a') as cf:
             dw = csv.DictWriter(cf, fieldnames=rowd.keys())

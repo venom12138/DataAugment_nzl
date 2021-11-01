@@ -31,7 +31,7 @@ parser.add_argument('--model', default='resnet', type=str,
 parser.add_argument('--print-freq', '-p', default=10, type=int,
                     help='print frequency (default: 10)')
 
-parser.add_argument('--layers', default=32, type=int,
+parser.add_argument('--layers', default=56, type=int,
                     help='total number of layers (have to be explicitly given!)')
 
 parser.add_argument('--droprate', default=0.0, type=float,
@@ -56,11 +56,10 @@ parser.add_argument('--en_wandb', action='store_true')
 
 parser.add_argument('--finetune', type=int, default=0)
 parser.add_argument('--optim_ckpt', type=str, default='')
-parser.add_argument('--local_module_ckpt', type=str, default='')
 
-parser.add_argument('--epochs', type=int, default=160)
-parser.add_argument('--initial_learning_rate', type=float, default=0.1)
-parser.add_argument('--changing_lr', type=int, nargs="+", default=[80, 120])
+parser.add_argument('--epochs', type=int, nargs='+', default=[100, 20])
+parser.add_argument('--initial_learning_rate', type=float, nargs='+', default=[0.8, 0.8])
+parser.add_argument('--batch_size', type=int, nargs='+', default=[1024, 1024])
 
 parser.add_argument('--stage', type=int, default=None)  # None: baseline
 parser.add_argument('--aux_config', type=str, default=None)
@@ -70,23 +69,25 @@ args = parser.parse_args()
 # Configurations adopted for training deep networks.
 training_configurations = {
     'resnet': {
+        'epochs': 160,
         'batch_size': 128,
+        'initial_learning_rate': 0.1,
         'lr_decay_rate': 0.1,
         'momentum': 0.9,
         'nesterov': True,
         'weight_decay': 1e-4,
     },
 }
-training_configurations['resnet'].update(vars(args))
+exp = ExpHandler(args.en_wandb)
+exp.save_config(args)
 
-def main():
-    global best_prec1, exp
-    exp = ExpHandler(args.en_wandb)
-    exp.save_config(args)
+if args.en_wandb:
+    wandb.define_metric('local_train/eval_top1', summary='max')
+    wandb.define_metric('finetune/eval_top1', summary='max')
 
-    if args.en_wandb:
-        wandb.define_metric('eval_top1', summary='max')
-        wandb.define_metric('epoch_time', hidden=True)
+
+def main(phase):
+    global best_prec1
 
     best_prec1 = 0
 
@@ -150,14 +151,11 @@ def main():
     model = model.cuda()
     if args.finetune:
         optim_checkpoint = torch.load(args.optim_ckpt)
-        checkpoint = torch.load(args.local_module_ckpt)
-        model.load_state_dict(optim_checkpoint['state_dict'])
+        checkpoint = torch.load(exp.save_dir + '/checkpoint.pth.tar')
+        model.load_state_dict(optim_checkpoint['state_dict'], strict=False)  # aux_classifier出问题
         model.load_state_dict(checkpoint['state_dict'], strict=False)
-        start_epoch = 0
-    else:
-        start_epoch = 0
 
-    for epoch in range(start_epoch, training_configurations[args.model]['epochs']):
+    for epoch in range(0, training_configurations[args.model]['epochs']):
         start_time = time.time()
         adjust_learning_rate(optimizer, epoch + 1)
 
@@ -179,9 +177,8 @@ def main():
         }, is_best, checkpoint=exp.save_dir)
         print('Best accuracy: ', best_prec1)
 
-        exp.write(epoch, eval_metrics, train_metrics,
-                  epoch_time=f'{(time.time() - start_time) / 60:.1f}', lr=optimizer.param_groups[0]['lr'])
-    exp.finish()
+        exp.write(phase, eval_metrics, train_metrics, epoch=epoch,
+                  lr=optimizer.param_groups[0]['lr'])
 
 def train(train_loader, model, criterion, optimizer, epoch):
     """Train for one epoch on the training set"""
@@ -332,4 +329,16 @@ def accuracy(output, target, topk=(1,)):
     return res
 
 if __name__ == '__main__':
-    main()
+    keys2update = vars(args).keys() & training_configurations['resnet'].keys()
+
+    training_configurations['resnet'].update({k: vars(args)[k][0] for k in keys2update})
+    main(phase='local_train')
+
+    # finetuning
+    training_configurations['resnet'].update({k: vars(args)[k][1] for k in keys2update})
+    args.finetune = 1
+    args.stage = None
+    args.aux_config = None
+    main(phase='finetune')
+
+    exp.finish()
