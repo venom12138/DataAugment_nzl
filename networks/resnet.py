@@ -476,6 +476,16 @@ class ResNet_Cifar(nn.Module):
                 state_dict.pop(k)
         return state_dict
 
+    def gen_feature(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+
+        feat1 = self.layer1(x)  # feature map1
+        feat2 = self.layer2(feat1)  # feature map2
+
+        return x, feat1, feat2
+
 
 def resnet20_cifar(**kwargs):
     model = ResNet_Cifar(BasicBlock, [3, 3, 3], **kwargs)
