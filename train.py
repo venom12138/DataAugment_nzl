@@ -60,6 +60,7 @@ parser.add_argument('--optim_ckpt', type=str, default='')
 parser.add_argument('--epochs', type=int, nargs='+', default=[100, 20])
 parser.add_argument('--initial_learning_rate', type=float, nargs='+', default=[0.8, 0.8])
 parser.add_argument('--batch_size', type=int, nargs='+', default=[1024, 1024])
+parser.add_argument('--changing_lr', type=int, nargs='+', default=[80, 20])
 
 parser.add_argument('--stage', type=int, default=None)  # None: baseline
 parser.add_argument('--aux_config', type=str, default=None)
@@ -304,7 +305,7 @@ class AverageMeter(object):
 def adjust_learning_rate(optimizer, epoch):
     """Sets the learning rate"""
     if not args.cos_lr:
-        if epoch in training_configurations[args.model]['changing_lr']:
+        if epoch in [training_configurations[args.model]['changing_lr']]:
             for param_group in optimizer.param_groups:
                 param_group['lr'] *= training_configurations[args.model]['lr_decay_rate']
 
