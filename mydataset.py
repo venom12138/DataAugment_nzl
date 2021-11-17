@@ -1,3 +1,4 @@
+import torch
 from PIL import Image
 import os
 import os.path
@@ -56,6 +57,7 @@ class myCIFAR10(VisionDataset):
             target_transform: Optional[Callable] = None,
             download: bool = False,
             stage: int = None,
+            feat_transform: Optional[Callable] = lambda x: x
     ) -> None:
 
         super(myCIFAR10, self).__init__(root, transform=transform,
@@ -78,6 +80,7 @@ class myCIFAR10(VisionDataset):
         self.data: Any = []
         self.targets = []
 
+        self.feat_transform = feat_transform
         # now load the picked numpy arrays
         for file_name, checksum in downloaded_list:
             file_path = os.path.join(self.root, self.base_folder, file_name)
@@ -131,6 +134,8 @@ class myCIFAR10(VisionDataset):
 
             if self.target_transform is not None:
                 target = self.target_transform(target)
+        else:
+            img = self.feat_transform(torch.from_numpy(img))
         return img, target
 
     def __len__(self) -> int:
