@@ -20,6 +20,7 @@ import networks.resnet
 from utils import ExpHandler
 from collections import OrderedDict
 from mydataset import myCIFAR10
+from networks.losses import MySupConLoss
 
 parser = argparse.ArgumentParser(description='Implicit Semantic Data Augmentation (ISDA)')
 parser.add_argument('--dataset', default='cifar10', type=str,
@@ -65,6 +66,7 @@ parser.add_argument('--changing_lr', type=int, nargs='+', default=[80, 20])
 parser.add_argument('--stage', type=int, default=None)  # None: baseline
 parser.add_argument('--aux_config', type=str, default=None)
 
+parser.add_argument('--criterion', type=str, nargs='+', default=['cross_entropy'])
 args = parser.parse_args()
 
 # Configurations adopted for training deep networks.
@@ -142,7 +144,10 @@ def main(phase):
 
     cudnn.benchmark = True
 
-    ce_criterion = nn.CrossEntropyLoss().cuda()
+    if not args.finetune and args.criterion == 'contrast':
+        criterion = MySupConLoss().cuda()
+    else:
+        criterion = nn.CrossEntropyLoss().cuda()
 
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=training_configurations[args.model]['initial_learning_rate'],
@@ -162,10 +167,10 @@ def main(phase):
         adjust_learning_rate(optimizer, epoch + 1)
 
         # train for one epoch
-        train_metrics = train(train_loader, model, ce_criterion, optimizer, epoch)
+        train_metrics = train(train_loader, model, criterion, optimizer, epoch)
 
         # evaluate on validation set
-        eval_metrics, prec1 = validate(val_loader, model, ce_criterion, epoch)
+        eval_metrics, prec1 = validate(val_loader, model, criterion, epoch)
 
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
