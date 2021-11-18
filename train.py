@@ -350,12 +350,13 @@ def accuracy(output, target, topk=(1,)):
 
 if __name__ == '__main__':
     keys2update = vars(args).keys() & training_configurations['resnet'].keys()
+    conf = {k: v if len(v) == 2 else v+v for k, v in vars(args).items() if k in keys2update}
 
-    training_configurations['resnet'].update({k: vars(args)[k][0] for k in keys2update})
+    training_configurations['resnet'].update({k: v[0] for k, v in conf.items()})
     main(phase='local_train')
 
     # finetuning
-    training_configurations['resnet'].update({k: vars(args)[k][1] for k in keys2update})
+    training_configurations['resnet'].update({k: v[1] for k, v in conf.items()})
     args.finetune = 1
     args.stage = None
     args.aux_config = None
