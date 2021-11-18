@@ -57,9 +57,9 @@ parser.add_argument('--en_wandb', action='store_true')
 parser.add_argument('--finetune', type=int, default=0)
 parser.add_argument('--optim_ckpt', type=str, default='')
 
-parser.add_argument('--epochs', type=int, nargs='+', default=[100, 20])
-parser.add_argument('--initial_learning_rate', type=float, nargs='+', default=[0.8, 0.8])
-parser.add_argument('--batch_size', type=int, nargs='+', default=[1024, 1024])
+parser.add_argument('--epochs', type=int, nargs='+', default=[100, 30])
+parser.add_argument('--initial_learning_rate', type=float, nargs='+', default=[0.1])
+parser.add_argument('--batch_size', type=int, nargs='+', default=[128])
 parser.add_argument('--changing_lr', type=int, nargs='+', default=[80, 20])
 
 parser.add_argument('--stage', type=int, default=None)  # None: baseline
