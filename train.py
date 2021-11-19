@@ -65,6 +65,7 @@ parser.add_argument('--changing_lr', type=int, nargs='+', default=[80, 20])
 parser.add_argument('--stage', type=int, default=None)  # None: baseline
 parser.add_argument('--aux_config', type=str, default=None)
 
+parser.add_argument('--feat_transform', type=str, nargs='+', default=[])
 args = parser.parse_args()
 
 # Configurations adopted for training deep networks.
@@ -123,11 +124,28 @@ def main(phase):
         normalize
         ])
 
+    feat_transform = []
+    if args.stage is not None and args.stage != 1:
+        if 'rand_crop' in args.feat_transform:
+            if args.stage == 2:
+                p = 4
+                h = 32
+            if args.stage == 3:
+                p = 2
+                h = 16
+            feat_transform.extend([transforms.Lambda(lambda x: F.pad(x.unsqueeze(0),
+                                          (p, p, p, p), mode='reflect').squeeze()),
+                                   transforms.RandomCrop(h)])
+        if 'flip' in args.feat_transform:
+            feat_transform.append(transforms.RandomHorizontalFlip())
+    feat_transform = transforms.Compose(feat_transform)
+
+
     kwargs = {'num_workers': 1, 'pin_memory': True}
     assert(args.dataset == 'cifar10' or args.dataset == 'cifar100')
     train_loader = torch.utils.data.DataLoader(
         myCIFAR10('data', feature_path = 'data/save_feature', train=True, download=True, transform=transform_train,
-                  stage=args.stage),
+                  stage=args.stage, feat_transform=feat_transform),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=True, **kwargs)
     val_loader = torch.utils.data.DataLoader(
         myCIFAR10('data', feature_path = 'data/save_feature', train=False, download=True, transform=transform_test,
