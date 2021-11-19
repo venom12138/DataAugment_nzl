@@ -6,7 +6,7 @@ from __future__ import print_function
 
 import torch
 import torch.nn as nn
-
+from torch.nn import functional as F
 
 class SupConLoss(nn.Module):
     """Supervised Contrastive Learning: https://arxiv.org/pdf/2004.11362.pdf.
@@ -97,3 +97,15 @@ class SupConLoss(nn.Module):
         loss = loss.view(anchor_count, batch_size).mean()
 
         return loss
+
+class MySupConLoss(SupConLoss):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, features, labels=None, temperature=0.07, mask=None):
+        features = F.normalize(features, dim=1)
+        features = features.unsqueeze(1)
+        loss = SupConLoss.forward(self, features, labels)
+        return loss
+
+
