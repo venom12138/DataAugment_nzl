@@ -380,6 +380,43 @@ class AuxClassifier(nn.Module):
 
         return features
 
+class AuxClassifierNew(nn.Module):
+    def __init__(self, inplanes, class_num=10, widen=1, feature_dim=128):
+        super(AuxClassifierNew, self).__init__()
+
+        assert inplanes in [16, 32]
+
+        self.feature_dim = feature_dim
+
+        self.criterion = nn.CrossEntropyLoss()
+        self.fc_out_channels = class_num
+
+        if inplanes == 16:
+            self.head = nn.Sequential(
+                nn.Conv2d(16, int(32 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(int(32 * widen)),
+                nn.ReLU(),
+                nn.Conv2d(int(32 * widen), int(64 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(int(64 * widen)),
+                nn.ReLU(),
+                nn.AdaptiveAvgPool2d((1, 1)),
+                nn.Flatten(),
+                nn.Linear(int(64 * widen), self.fc_out_channels),
+            )
+        elif inplanes == 32:
+            self.head = nn.Sequential(
+                nn.Conv2d(32, int(64 * widen), kernel_size=3, stride=2, padding=1, bias=False),
+                nn.BatchNorm2d(int(64 * widen)),
+                nn.ReLU(),
+                nn.AdaptiveAvgPool2d((1, 1)),
+                nn.Flatten(),
+                nn.Linear(int(64 * widen), self.fc_out_channels),
+            )
+
+    def forward(self, x):
+        features = self.head(x)
+        return features
+
 
 class ResNet_Cifar(nn.Module):
 
@@ -399,9 +436,12 @@ class ResNet_Cifar(nn.Module):
         self.stage = stage
         if stage == 1 or stage == 2:
             assert aux_config is not None
-            self.aux_classifier = AuxClassifier(inplanes=16 if stage == 1 else 32, net_config=aux_config,
-                                                loss_mode='cross_entropy', class_num=class_num,
-                                                )
+            if aux_config == 'new':
+                self.aux_classifier = AuxClassifierNew(inplanes=16 if stage == 1 else 32, class_num=class_num)
+            else:
+                self.aux_classifier = AuxClassifier(inplanes=16 if stage == 1 else 32, net_config=aux_config,
+                                                    loss_mode='cross_entropy', class_num=class_num,
+                                                    )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(64 * block.expansion, class_num)
 
