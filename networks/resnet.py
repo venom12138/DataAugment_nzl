@@ -174,10 +174,8 @@ class AuxClassifier(nn.Module):
         self.feature_dim = feature_dim
 
         if loss_mode == 'contrast':
-            self.criterion = SupConLoss()
             self.fc_out_channels = feature_dim
         elif loss_mode == 'cross_entropy':
-            self.criterion = nn.CrossEntropyLoss()
             self.fc_out_channels = class_num
         else:
             raise NotImplementedError
@@ -384,7 +382,7 @@ class AuxClassifier(nn.Module):
 class ResNet_Cifar(nn.Module):
 
     def __init__(self, block, layers, dropout_rate=0, class_num=10, stage=None
-                 , aux_config=None):
+                 , aux_config=None, aux_criterion='cross_entropy'):
         super(ResNet_Cifar, self).__init__()
         self.inplanes = 16
         self.dropout_rate = dropout_rate
@@ -400,7 +398,7 @@ class ResNet_Cifar(nn.Module):
         if stage == 1 or stage == 2:
             assert aux_config is not None
             self.aux_classifier = AuxClassifier(inplanes=16 if stage == 1 else 32, net_config=aux_config,
-                                                loss_mode='cross_entropy', class_num=class_num,
+                                                loss_mode=aux_criterion, class_num=class_num,
                                                 )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(64 * block.expansion, class_num)

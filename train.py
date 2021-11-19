@@ -66,7 +66,7 @@ parser.add_argument('--changing_lr', type=int, nargs='+', default=[80, 20])
 parser.add_argument('--stage', type=int, default=None)  # None: baseline
 parser.add_argument('--aux_config', type=str, default=None)
 
-parser.add_argument('--criterion', type=str, nargs='+', default=['cross_entropy'])
+parser.add_argument('--criterion', type=str, default='cross_entropy')
 args = parser.parse_args()
 
 # Configurations adopted for training deep networks.
@@ -126,21 +126,20 @@ def main(phase):
         ])
 
     kwargs = {'num_workers': 1, 'pin_memory': True}
-    assert(args.dataset == 'cifar10' or args.dataset == 'cifar100')
+    assert (args.dataset == 'cifar10' or args.dataset == 'cifar100')
     train_loader = torch.utils.data.DataLoader(
-        myCIFAR10('data', feature_path = 'data/save_feature', train=True, download=True, transform=transform_train,
+        myCIFAR10('data', feature_path='data/save_feature', train=True, download=True, transform=transform_train,
                   stage=args.stage),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=True, **kwargs)
     val_loader = torch.utils.data.DataLoader(
-        myCIFAR10('data', feature_path = 'data/save_feature', train=False, download=True, transform=transform_test,
+        myCIFAR10('data', feature_path='data/save_feature', train=False, download=True, transform=transform_test,
                   stage=args.stage),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=False, **kwargs)
 
-    # create model
-    model = eval('networks.resnet.resnet' + str(args.layers) + '_cifar')\
+    # create model, giving aux_criterion to control feature_dim
+    model = eval('networks.resnet.resnet' + str(args.layers) + '_cifar') \
         (dropout_rate=args.droprate, class_num=class_num,
-         stage=args.stage, aux_config=args.aux_config)
-
+         stage=args.stage, aux_config=args.aux_config, aux_criterion=args.criterion)
 
     cudnn.benchmark = True
 
