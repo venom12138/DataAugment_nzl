@@ -69,6 +69,7 @@ parser.add_argument('--feat_transform', type=str, nargs='+', default=[])
 parser.add_argument('--criterion', type=str, default='cross_entropy')
 parser.add_argument('--baseline_type', type=str, default=None,
                     choices=['rand', 'best'])  # run baseline exp with local train epoch=0
+parser.add_argument('--local_ckpt_opt', type=str, default='last', choices=['last', 'best'])
 args = parser.parse_args()
 
 # Configurations adopted for training deep networks.
@@ -129,7 +130,7 @@ def main(phase):
         ])
 
     feat_transform = []
-    if args.stage is not None and args.stage != 1:
+    if phase == 'local_train' and args.stage != 1:
         if 'rand_crop' in args.feat_transform:
             if args.stage == 2:
                 p = 4
@@ -138,12 +139,11 @@ def main(phase):
                 p = 2
                 h = 16
             feat_transform.extend([transforms.Lambda(lambda x: F.pad(x.unsqueeze(0),
-                                          (p, p, p, p), mode='reflect').squeeze()),
+                                                                     (p, p, p, p), mode='reflect').squeeze()),
                                    transforms.RandomCrop(h)])
         if 'flip' in args.feat_transform:
             feat_transform.append(transforms.RandomHorizontalFlip())
     feat_transform = transforms.Compose(feat_transform)
-
 
     kwargs = {'num_workers': 1, 'pin_memory': True}
     assert(args.dataset == 'cifar10' or args.dataset == 'cifar100')
@@ -190,7 +190,10 @@ def main(phase):
 
     if phase == 'finetune':
         optim_checkpoint = torch.load(args.optim_ckpt)
-        checkpoint = torch.load(exp.save_dir + '/checkpoint.pth.tar')
+        if args.local_ckpt_opt == 'best':
+            checkpoint = torch.load(exp.save_dir + '/model_best.pth.tar')
+        else:
+            checkpoint = torch.load(exp.save_dir + '/checkpoint.pth.tar')
         model.load_state_dict(optim_checkpoint['state_dict'], strict=False)  # aux_classifier出问题
         model.load_state_dict(checkpoint['state_dict'], strict=False)
 
