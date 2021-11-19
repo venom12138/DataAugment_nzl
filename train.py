@@ -55,7 +55,6 @@ parser.add_argument('--cos_lr', dest='cos_lr', action='store_true',
 parser.set_defaults(cos_lr=False)
 parser.add_argument('--en_wandb', action='store_true')
 
-parser.add_argument('--finetune', type=int, default=0)
 parser.add_argument('--optim_ckpt', type=str, default='')
 
 parser.add_argument('--epochs', type=int, nargs='+', default=[100, 30])
@@ -68,6 +67,8 @@ parser.add_argument('--aux_config', type=str, default=None)
 
 parser.add_argument('--feat_transform', type=str, nargs='+', default=[])
 parser.add_argument('--criterion', type=str, default='cross_entropy')
+parser.add_argument('--baseline_type', type=str, default=None,
+                    choices=['rand', 'best'])  # run baseline exp with local train epoch=0
 args = parser.parse_args()
 
 # Configurations adopted for training deep networks.
@@ -92,6 +93,7 @@ if args.en_wandb:
 
 
 def main(phase):
+    print('-' * 10, f'{phase} phase', '-' * 10)
     global best_prec1
 
     best_prec1 = 0
@@ -173,7 +175,20 @@ def main(phase):
                                 weight_decay=training_configurations[args.model]['weight_decay'])
 
     model = model.cuda()
-    if args.finetune:
+
+    if args.baseline_type and phase == 'local_train':  # run baseline exp with local train epoch=0
+        training_configurations[args.model]['epochs'] = 0
+        if args.baseline_type == 'best':
+            optim_checkpoint = torch.load(args.optim_ckpt)
+            model.load_state_dict(optim_checkpoint['state_dict'], strict=False)
+        save_checkpoint({
+            'epoch': 0,
+            'state_dict': model.state_dict(),
+            'best_acc': best_prec1,
+            'optimizer': optimizer.state_dict(),
+        }, True, checkpoint=exp.save_dir)
+
+    if phase == 'finetune':
         optim_checkpoint = torch.load(args.optim_ckpt)
         checkpoint = torch.load(exp.save_dir + '/checkpoint.pth.tar')
         model.load_state_dict(optim_checkpoint['state_dict'], strict=False)  # aux_classifier出问题
@@ -361,7 +376,6 @@ if __name__ == '__main__':
 
     # finetuning
     training_configurations['resnet'].update({k: v[1] for k, v in conf.items()})
-    args.finetune = 1
     args.stage = None
     args.aux_config = None
     main(phase='finetune')
