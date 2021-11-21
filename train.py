@@ -56,6 +56,7 @@ parser.set_defaults(cos_lr=False)
 parser.add_argument('--en_wandb', action='store_true')
 
 parser.add_argument('--optim_ckpt', type=str, default='')
+parser.add_argument('--local_ckpt', type=str, default='')
 
 parser.add_argument('--epochs', type=int, nargs='+', default=[100, 30])
 parser.add_argument('--initial_learning_rate', type=float, nargs='+', default=[0.1])
@@ -69,7 +70,7 @@ parser.add_argument('--feat_transform', type=str, nargs='+', default=[])
 parser.add_argument('--criterion', type=str, default='cross_entropy')
 parser.add_argument('--baseline_type', type=str, default=None,
                     choices=['rand', 'best'])  # run baseline exp with local train epoch=0
-parser.add_argument('--local_ckpt_opt', type=str, default='last', choices=['last', 'best'])
+parser.add_argument('--local_ckpt_opt', type=str, default='last', choices=['last', 'best', 'path'])
 args = parser.parse_args()
 
 # Configurations adopted for training deep networks.
@@ -192,8 +193,13 @@ def main(phase):
         optim_checkpoint = torch.load(args.optim_ckpt)
         if args.local_ckpt_opt == 'best':
             checkpoint = torch.load(exp.save_dir + '/model_best.pth.tar')
-        else:
+        elif args.local_ckpt_opt == 'last':
             checkpoint = torch.load(exp.save_dir + '/checkpoint.pth.tar')
+        elif args.local_ckpt_opt == 'path':
+            assert args.local_ckpt != ''
+            checkpoint = torch.load(args.local_ckpt)
+        else:
+            raise NotImplementedError
         model.load_state_dict(optim_checkpoint['state_dict'], strict=False)  # aux_classifier出问题
         model.load_state_dict(checkpoint['state_dict'], strict=False)
 
