@@ -124,17 +124,17 @@ def main(phase):
     assert(args.dataset == 'cifar10' or args.dataset == 'cifar100')
     train_loader = torch.utils.data.DataLoader(
         myCIFAR10('data', feature_path = 'data/save_feature', train=True, download=True, transform=transform_train,
-                  stage=args.stage),
+                    stage=args.stage),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=True, **kwargs)
     val_loader = torch.utils.data.DataLoader(
         myCIFAR10('data', feature_path = 'data/save_feature', train=False, download=True, transform=transform_test,
-                  stage=args.stage),
+                stage=args.stage),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=False, **kwargs)
 
     # create model
     model = eval('networks.resnet.resnet' + str(args.layers) + '_cifar')\
         (dropout_rate=args.droprate, class_num=class_num,
-         stage=args.stage, aux_config=args.aux_config)
+            stage=args.stage, aux_config=args.aux_config)
 
 
     cudnn.benchmark = True

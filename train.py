@@ -140,8 +140,8 @@ def main(phase):
                 p = 2
                 h = 16
             feat_transform.extend([transforms.Lambda(lambda x: F.pad(x.unsqueeze(0),
-                                                                     (p, p, p, p), mode='reflect').squeeze()),
-                                   transforms.RandomCrop(h)])
+                                                                    (p, p, p, p), mode='reflect').squeeze()),
+                                transforms.RandomCrop(h)])
         if 'flip' in args.feat_transform:
             feat_transform.append(transforms.RandomHorizontalFlip())
     feat_transform = transforms.Compose(feat_transform)
@@ -150,17 +150,17 @@ def main(phase):
     assert(args.dataset == 'cifar10' or args.dataset == 'cifar100')
     train_loader = torch.utils.data.DataLoader(
         myCIFAR10('data', feature_path='data/save_feature', train=True, download=True, transform=transform_train,
-                  stage=args.stage, feat_transform=feat_transform),
+                    stage=args.stage, feat_transform=feat_transform),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=True, **kwargs)
     val_loader = torch.utils.data.DataLoader(
         myCIFAR10('data', feature_path='data/save_feature', train=False, download=True, transform=transform_test,
-                  stage=args.stage),
+                    stage=args.stage),
         batch_size=training_configurations[args.model]['batch_size'], shuffle=False, **kwargs)
 
     # create model, giving aux_criterion to control feature_dim
     model = eval('networks.resnet.resnet' + str(args.layers) + '_cifar') \
         (dropout_rate=args.droprate, class_num=class_num,
-         stage=args.stage, aux_config=args.aux_config, aux_criterion=args.criterion)
+            stage=args.stage, aux_config=args.aux_config, aux_criterion=args.criterion)
 
     cudnn.benchmark = True
 
@@ -226,7 +226,7 @@ def main(phase):
         print('Best accuracy: ', best_prec1)
 
         exp.write(phase, eval_metrics, train_metrics, epoch=epoch,
-                  lr=optimizer.param_groups[0]['lr'])
+                    lr=optimizer.param_groups[0]['lr'])
 
 def train(train_loader, model, criterion, optimizer, epoch):
     """Train for one epoch on the training set"""
