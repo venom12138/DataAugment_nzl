@@ -13,13 +13,14 @@ class ExpHandler:
     _home = Path.home()
 
     def __init__(self, en_wandb=False):
+        project_name = os.getenv('project_name', default='default_project')
         exp_name = os.getenv('exp_name', default='default_group')
         run_name = os.getenv('run_name', default='default_name')
         self._exp_id = f'{self._get_exp_id()}_{run_name}'
         self._exp_name = exp_name
 
         self._save_dir = os.path.join('{}/.exp/{}'.format(self._home, os.getenv('WANDB_PROJECT', default='default_project')),
-                                      exp_name, self._exp_id)
+                                    exp_name, self._exp_id)
         if not os.path.exists(self._save_dir):
             os.makedirs(self._save_dir)
 
@@ -30,7 +31,7 @@ class ExpHandler:
         self._en_wandb = en_wandb
 
         if en_wandb:
-            wandb.init(group=exp_name, name=run_name)
+            wandb.init(project=project_name,group=exp_name, name=run_name)
 
     def _get_sym_path(self, state):
         sym_dir = f'{self._home}/.exp/syms'
